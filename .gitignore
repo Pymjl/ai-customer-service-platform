@@ -26,4 +26,4 @@ Thumbs.db
 # Application
 application-*.properties
 
-docs/sdd
+.claude
