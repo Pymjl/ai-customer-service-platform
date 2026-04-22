@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS cs_user (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL UNIQUE,
+    tenant_id VARCHAR(64) NOT NULL,
+    username VARCHAR(64) NOT NULL,
+    password VARCHAR(128) NOT NULL,
+    status TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_tenant_username (tenant_id, username),
+    INDEX idx_tenant (tenant_id)
+);

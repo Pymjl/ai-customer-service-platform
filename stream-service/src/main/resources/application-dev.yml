@@ -1,0 +1,26 @@
+server:
+  port: 8082
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: dev
+rocketmq:
+  name-server: localhost:9876
+  producer:
+    group: stream-service-producer
+    send-message-timeout: 3000
+python:
+  engine:
+    base-url: http://localhost:8000
+    max-connections: 200
+    acquire-timeout: 3000
+    connect-timeout: 5000
+    response-timeout: 310000
+stream:
+  sse:
+    heartbeat-interval: 15s
+    max-duration: 300s
+internal:
+  token: dev-internal-secret
