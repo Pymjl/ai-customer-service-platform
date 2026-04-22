@@ -1,0 +1,27 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+.vscode/
+
+# IDE - Eclipse
+.metadata/
+bin/
+.settings/
+.project
+.classpath
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+application-*.properties
