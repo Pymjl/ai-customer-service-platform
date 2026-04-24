@@ -1,6 +1,6 @@
-# ai-customer-service-platform
+﻿# ai-customer-service-platform
 
-`ai-customer-service-platform` 是一个基于 Java 21、Spring Boot 3、Spring Cloud 的多模块 AI 客服平台后端工程。当前仓库已经搭好网关、用户中心、对话流服务、业务服务和公共模块的基础骨架，并预留了与 Python AI 引擎、RocketMQ、Nacos、MySQL、Redis 的集成点。
+`ai-customer-service-platform` 是一个基于 Java 21、Spring Boot 3、Spring Cloud 的多模块 AI 客服平台后端工程。当前仓库已经搭好网关、用户中心、对话流服务、业务服务和公共模块的基础骨架，并预留了与 Python AI 引擎、RocketMQ、Nacos、PostgreSQL、Redis 的集成点。
 
 需要先说明一个事实：从当前代码看，这个仓库更接近“可继续开发的微服务脚手架”，而不是“已经完整打通并可直接上线”的成品。README 以下内容以当前代码实现为准。
 
@@ -26,7 +26,7 @@ ai-customer-service-platform/
 | 服务治理 | Nacos |
 | 网关 | Spring Cloud Gateway |
 | 安全 | Spring Security, Spring Authorization Server |
-| 数据访问 | MyBatis, Flyway, MySQL |
+| 数据访问 | MyBatis, Flyway, PostgreSQL |
 | 缓存 | Redis |
 | 消息队列 | RocketMQ |
 | 响应式 | WebFlux, Reactor |
@@ -38,10 +38,10 @@ ai-customer-service-platform/
 | 模块 | 端口 | 主要职责 | 当前状态 |
 | --- | --- | --- | --- |
 | `common` | 无 | 公共常量、异常、返回体、事件 DTO、工具类 | 可复用 |
-| `gateway-service` | `8080` | 路由转发、入口拦截、请求头透传 | 已有基础路由，鉴权仍是占位实现 |
-| `user-service` | `8081` | 用户、角色、权限接口，授权服务入口 | 控制器已建，Service 多为占位实现 |
-| `stream-service` | `8082` | SSE 对话接口、内部查询接口、消息事件发布 | 主链路已搭骨架，AI 引擎调用未真正接入主流程 |
-| `biz-service` | `8083` | 会话、消息接口，消费对话完成事件 | 控制器和消费者已建，持久化逻辑仍是占位实现 |
+| `gateway-service` | `18080` | 路由转发、入口拦截、请求头透传 | 已有基础路由，鉴权仍是占位实现 |
+| `user-service` | `18081` | 用户、角色、权限接口，授权服务入口 | 控制器已建，Service 多为占位实现 |
+| `stream-service` | `18082` | SSE 对话接口、内部查询接口、消息事件发布 | 主链路已搭骨架，AI 引擎调用未真正接入主流程 |
+| `biz-service` | `18083` | 会话、消息接口，消费对话完成事件 | 控制器和消费者已建，持久化逻辑仍是占位实现 |
 
 ## 4. 系统架构图
 
@@ -55,18 +55,18 @@ flowchart LR
     C[客户端]
 
     subgraph Java服务
-        G[gateway-service<br/>:8080]
-        U[user-service<br/>:8081]
-        S[stream-service<br/>:8082]
-        B[biz-service<br/>:8083]
+        G[gateway-service<br/>:18080]
+        U[user-service<br/>:18081]
+        S[stream-service<br/>:18082]
+        B[biz-service<br/>:18083]
         CM[common]
     end
 
     subgraph 基础设施
         NC[Nacos]
         RU[(Redis)]
-        DBU[(MySQL: aicsp_user)]
-        DBB[(MySQL: aicsp_biz)]
+        DBU[(PostgreSQL: aicsp_user)]
+        DBB[(PostgreSQL: aicsp_biz)]
         MQ[(RocketMQ)]
         PY[Python AI 引擎]
     end
@@ -165,7 +165,7 @@ sequenceDiagram
 | --- | --- | --- |
 | JDK | 21 | 项目根 POM 固定为 Java 21 |
 | Maven | 3.9+ | 多模块构建 |
-| MySQL | 8.x | `user-service` 和 `biz-service` 依赖 |
+| PostgreSQL | 17+ | `user-service` 和 `biz-service` 依赖，dev 环境使用 pgvector/pgvector:pg17 |
 | Redis | 7.x | 网关、用户、业务服务依赖 |
 | Nacos | 2.x | 网关路由使用 `lb://`，本地也建议启用服务注册发现 |
 | RocketMQ | 5.x | `stream-service` 生产消息，`biz-service` 消费消息 |
@@ -173,7 +173,7 @@ sequenceDiagram
 
 ### 7.2 推荐启动顺序
 
-1. MySQL
+1. PostgreSQL
 2. Redis
 3. Nacos
 4. RocketMQ
@@ -199,10 +199,10 @@ sequenceDiagram
 
 | 配置项 | dev 默认值 | 是否必须修改 | 说明 |
 | --- | --- | --- | --- |
-| `server.port` | `8080` | 按需 | 端口冲突时修改 |
+| `server.port` | `18080` | 按需 | 端口冲突时修改 |
 | `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
 | `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
-| `spring.data.redis.password` | prod 为空 | 生产必须 | 生产环境通常要填 |
+| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
 | `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
 | `spring.cloud.nacos.discovery.namespace` | `dev` / `prod` | 建议核对 | 命名空间要和服务注册一致 |
 | `spring.cloud.gateway.routes[*]` | 已内置 | 按需 | 路由前缀、目标服务名如有变化需要同步修改 |
@@ -223,12 +223,13 @@ sequenceDiagram
 
 | 配置项 | dev 默认值 | 是否必须修改 | 说明 |
 | --- | --- | --- | --- |
-| `server.port` | `8081` | 按需 | 端口冲突时修改 |
-| `spring.datasource.url` | `jdbc:mysql://localhost:3306/aicsp_user...` | 通常需要 | 数据库地址、库名 |
-| `spring.datasource.username` | `root` | 通常需要 | 数据库用户名 |
-| `spring.datasource.password` | 空 | 通常需要 | 数据库密码 |
+| `server.port` | `18081` | 按需 | 端口冲突时修改 |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_user` | 通常需要 | 数据库地址、库名 |
+| `spring.datasource.username` | `postgres` | 通常需要 | 数据库用户名 |
+| `spring.datasource.password` | `123456` | 通常需要 | dev 环境数据库密码 |
 | `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
 | `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
+| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
 | `spring.data.redis.database` | `1` | 建议核对 | Redis DB 编号 |
 | `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
 | `spring.cloud.nacos.discovery.namespace` | `dev` / `prod` | 建议核对 | 命名空间 |
@@ -249,12 +250,13 @@ sequenceDiagram
 
 | 配置项 | dev 默认值 | 是否必须修改 | 说明 |
 | --- | --- | --- | --- |
-| `server.port` | `8083` | 按需 | 端口冲突时修改 |
-| `spring.datasource.url` | `jdbc:mysql://localhost:3306/aicsp_biz...` | 通常需要 | 业务库地址、库名 |
-| `spring.datasource.username` | `root` | 通常需要 | 数据库用户名 |
-| `spring.datasource.password` | 空 | 通常需要 | 数据库密码 |
+| `server.port` | `18083` | 按需 | 端口冲突时修改 |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_biz` | 通常需要 | 业务库地址、库名 |
+| `spring.datasource.username` | `postgres` | 通常需要 | 数据库用户名 |
+| `spring.datasource.password` | `123456` | 通常需要 | dev 环境数据库密码 |
 | `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
 | `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
+| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
 | `spring.data.redis.database` | `2` | 建议核对 | Redis DB 编号 |
 | `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
 | `rocketmq.name-server` | `localhost:9876` | 通常需要 | RocketMQ NameServer |
@@ -276,7 +278,7 @@ sequenceDiagram
 
 | 配置项 | dev 默认值 | 是否必须修改 | 说明 |
 | --- | --- | --- | --- |
-| `server.port` | `8082` | 按需 | 端口冲突时修改 |
+| `server.port` | `18082` | 按需 | 端口冲突时修改 |
 | `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
 | `rocketmq.name-server` | `localhost:9876` | 通常需要 | RocketMQ NameServer |
 | `rocketmq.producer.group` | `stream-service-producer` | 一般保留 | 生产组名称 |

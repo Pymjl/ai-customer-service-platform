@@ -1,12 +1,74 @@
 CREATE TABLE IF NOT EXISTS cs_user (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(64) NOT NULL UNIQUE,
+    id BIGINT PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
     tenant_id VARCHAR(64) NOT NULL,
     username VARCHAR(64) NOT NULL,
     password VARCHAR(128) NOT NULL,
-    status TINYINT NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_tenant_username (tenant_id, username),
-    INDEX idx_tenant (tenant_id)
+    status SMALLINT NOT NULL DEFAULT 1,
+    created_by BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ DEFAULT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_user_user_id ON cs_user (user_id) WHERE deleted = FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_user_tenant_username ON cs_user (tenant_id, username) WHERE deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_cs_user_tenant ON cs_user (tenant_id) WHERE deleted = FALSE;
+
+CREATE TABLE IF NOT EXISTS cs_role (
+    id BIGINT PRIMARY KEY,
+    role_code VARCHAR(64) NOT NULL,
+    role_name VARCHAR(64) NOT NULL,
+    created_by BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_role_role_code ON cs_role (role_code) WHERE deleted = FALSE;
+
+CREATE TABLE IF NOT EXISTS cs_permission (
+    id BIGINT PRIMARY KEY,
+    permission_code VARCHAR(128) NOT NULL,
+    permission_name VARCHAR(64) NOT NULL,
+    created_by BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_permission_code ON cs_permission (permission_code) WHERE deleted = FALSE;
+
+CREATE TABLE IF NOT EXISTS cs_user_role (
+    id BIGINT PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    role_id BIGINT NOT NULL,
+    created_by BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_user_role ON cs_user_role (user_id, role_id) WHERE deleted = FALSE;
+
+CREATE TABLE IF NOT EXISTS cs_role_permission (
+    id BIGINT PRIMARY KEY,
+    role_id BIGINT NOT NULL,
+    permission_id BIGINT NOT NULL,
+    created_by BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_role_permission ON cs_role_permission (role_id, permission_id) WHERE deleted = FALSE;

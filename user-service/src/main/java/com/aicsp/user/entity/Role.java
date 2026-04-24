@@ -13,5 +13,10 @@ public class Role {
     private Long id;
     private String roleCode;
     private String roleName;
+    private Long createdBy;
     private LocalDateTime createdAt;
+    private Long updatedBy;
+    private LocalDateTime updatedAt;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 }

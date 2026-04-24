@@ -12,8 +12,13 @@ public interface MessageConverter {
 
     MessageDTO toDTO(Message message);
 
-    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "id", expression = "java(com.aicsp.common.util.DistributedIdUtils.nextId())")
+    @Mapping(target = "createdBy", expression = "java(0L)")
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedBy", expression = "java(0L)")
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", expression = "java(false)")
+    @Mapping(target = "deletedAt", ignore = true)
     @Mapping(source = "userMessage", target = "userMsg")
     Message fromEvent(MessageCompletedEvent event);
 

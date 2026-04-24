@@ -19,5 +19,10 @@ public class Message {
     private String aiReply;
     private String status;
     private String traceId;
+    private Long createdBy;
     private LocalDateTime createdAt;
+    private Long updatedBy;
+    private LocalDateTime updatedAt;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 }

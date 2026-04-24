@@ -5,7 +5,7 @@ spring:
     url:
     username:
     password:
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
   data:
     redis:
       host:

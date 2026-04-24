@@ -12,11 +12,15 @@ public interface UserConverter {
 
     UserDTO toDTO(User user);
 
-    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "id", expression = "java(com.aicsp.common.util.DistributedIdUtils.nextId())")
     @Mapping(target = "userId", expression = "java(java.util.UUID.randomUUID().toString())")
     @Mapping(target = "status", expression = "java(1)")
+    @Mapping(target = "createdBy", expression = "java(0L)")
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedBy", expression = "java(0L)")
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", expression = "java(false)")
+    @Mapping(target = "deletedAt", ignore = true)
     User toEntity(UserCreateRequest request);
 
     List<UserDTO> toDTOList(List<User> users);

@@ -12,10 +12,14 @@ public interface SessionConverter {
 
     SessionDTO toDTO(Session session);
 
-    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "id", expression = "java(com.aicsp.common.util.DistributedIdUtils.nextId())")
     @Mapping(target = "status", expression = "java(1)")
+    @Mapping(target = "createdBy", expression = "java(0L)")
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedBy", expression = "java(0L)")
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", expression = "java(false)")
+    @Mapping(target = "deletedAt", ignore = true)
     Session toEntity(SessionCreateRequest request);
 
     List<SessionDTO> toDTOList(List<Session> sessions);
