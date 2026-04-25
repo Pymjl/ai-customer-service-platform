@@ -140,6 +140,52 @@ sequenceDiagram
     User-->>Client: success
 ```
 
+### 双 token 与 Redis 验证流程
+
+`access token`、`refresh token` 和 `internal-token` 是不同用途的凭据：
+
+- `access token`：用户访问业务接口的短期 JWT，默认有效期 `900` 秒。
+- `refresh token`：用户换取新 access token 的长期随机 token，默认有效期 `259200` 秒。
+- `internal-token`：网关和内部服务之间的共享密钥，不代表用户登录态。
+
+登录成功后，`user-service` 会签发 access token，并生成一个不透明的 refresh token。refresh token 不以明文存储，服务端只将它的 SHA-256 hash 写入 Redis，key 形如 `aicsp:auth:refresh:{tokenId}`，value 保存 `userId.hash`，TTL 使用 `aicsp.jwt.refresh-ttl-seconds`。
+
+访问普通业务接口时，前端在请求头中携带 `Authorization: Bearer accessToken`。请求先进入 `gateway-service`，网关调用 `user-service` 的 `/api/auth/introspect` 校验 JWT 签名和过期时间，再调用 `/api/auth/authorize` 校验 RBAC 权限。校验通过后，网关向下游服务写入用户身份头和 `X-Internal-Token`。
+
+当前前端采用被动刷新策略，不会定时刷新 token。当普通业务请求返回 `401`，且本地存在 refresh token、当前请求不是登录/注册/验证码/刷新接口、该请求尚未重试过时，前端会调用 `/api/auth/refresh`。后端使用 Redis `GETDEL` 消费旧 refresh token，校验 hash 通过后签发新的 access token 和新的 refresh token。旧 refresh token 被删除后不能再次使用。
+
+两种用户 token 的刷新规则：
+
+- access token 会在登录成功时生成，也会在 `/api/auth/refresh` 成功时刷新。
+- refresh token 会在登录成功时生成，也会在每次 `/api/auth/refresh` 成功时轮换。
+- refresh token 一旦被刷新接口成功消费，旧值立即失效。
+- 用户登出时，当前 refresh token 会从 Redis 删除。
+- 用户不存在或被禁用时，服务端会撤销该用户关联的 refresh token。
+
+前端会清空本地登录态并跳转登录页的情况：
+
+- access token 无效或过期，且本地没有 refresh token。
+- access token 无效或过期，尝试 refresh token 续期失败。
+- refresh token 过期、格式错误、Redis 中不存在或 hash 不匹配。
+- refresh token 已被使用过，又被重复提交。
+- 用户主动登出。
+- 用户被删除或禁用。
+
+### 为什么这样设计
+
+access token 采用短有效期 JWT，可以让网关和用户服务快速校验用户身份与权限，避免每次业务请求都依赖服务端会话。refresh token 采用随机不透明 token，并只在 Redis 中保存 hash，是为了让长期凭据可撤销、可过期、可轮换，同时避免 Redis 泄露时直接暴露可用明文 token。
+
+刷新时使用一次性轮换机制，可以降低 refresh token 被窃取后的长期风险。旧 refresh token 被消费后立即删除，如果同一个 refresh token 被重复使用，说明可能存在重放或并发异常，服务端可以拒绝继续续期。前端只在 `401` 时被动刷新，可以减少无意义的后台刷新请求，并让 access token 自然过期。
+
+这种设计的主要收益：
+
+- access token 泄露窗口较短，默认最多影响 `900` 秒。
+- refresh token 可在 Redis 中主动吊销，支持登出和用户禁用后快速失效。
+- refresh token 明文不落库，降低存储侧泄露风险。
+- refresh token 轮换后旧 token 不能复用，降低重放攻击风险。
+- 网关统一做认证和授权，下游服务只接收可信身份头，业务代码不用重复实现鉴权流程。
+- Redis TTL 自动清理过期 refresh token，减少持久化状态管理成本。
+
 ## 对话数据流
 
 ```mermaid
