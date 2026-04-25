@@ -1,6 +1,6 @@
 package com.aicsp.biz.entity;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,9 +17,8 @@ public class Session {
     private String title;
     private Integer status;
     private Long createdBy;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     private Long updatedBy;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
     private Boolean deleted;
-    private LocalDateTime deletedAt;
 }

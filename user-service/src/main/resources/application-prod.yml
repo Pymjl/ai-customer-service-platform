@@ -68,7 +68,9 @@ aicsp:
     age: 18
   jwt:
     secret: 4f4bbb6ee20f3e4b0f12aade1a6cbf81c8554bb2c6ab5206b7dbc03942cf5796
-    ttl-seconds: 7200
+    ttl-seconds: 900
+    refresh-ttl-seconds: 259200
+    refresh-token-bytes: 32
   security:
     internal-token: 68d5ee453de54a35adfdb7f84f1ff8ef8cd10283c9e94979bdce1a8f927c7f79
   resource:

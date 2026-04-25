@@ -3,7 +3,7 @@ server:
 spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
-    url: jdbc:postgresql://localhost:5432/aicsp_biz
+    url: jdbc:postgresql://localhost:5432/aicsp_biz?currentSchema=biz_service
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
@@ -41,12 +41,15 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    schemas: biz_service
+    default-schema: biz_service
+    create-schemas: true
     baseline-on-migrate: true
   cloud:
     nacos:
       discovery:
         server-addr: localhost:8848
-        namespace: dev
+        namespace: af127353-dea2-4140-90cd-01cfbe3ceff3
         username: nacos
         password: nacos
 rocketmq:
@@ -57,3 +60,6 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+aicsp:
+  worker-id: 2

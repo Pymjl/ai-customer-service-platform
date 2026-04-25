@@ -18,7 +18,6 @@ public interface MessageConverter {
     @Mapping(target = "updatedBy", expression = "java(0L)")
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deleted", expression = "java(false)")
-    @Mapping(target = "deletedAt", ignore = true)
     @Mapping(source = "userMessage", target = "userMsg")
     Message fromEvent(MessageCompletedEvent event);
 

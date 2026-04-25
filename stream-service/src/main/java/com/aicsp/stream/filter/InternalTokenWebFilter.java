@@ -4,6 +4,7 @@ import com.aicsp.stream.config.StreamModuleProperties;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -26,7 +27,7 @@ public class InternalTokenWebFilter implements WebFilter, Ordered {
         }
 
         String token = exchange.getRequest().getHeaders().getFirst("X-Internal-Token");
-        if (properties.getInternalToken().equals(token)) {
+        if (StringUtils.hasText(properties.getInternalToken()) && properties.getInternalToken().equals(token)) {
             return chain.filter(exchange);
         }
 

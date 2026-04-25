@@ -19,7 +19,6 @@ public interface SessionConverter {
     @Mapping(target = "updatedBy", expression = "java(0L)")
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deleted", expression = "java(false)")
-    @Mapping(target = "deletedAt", ignore = true)
     Session toEntity(SessionCreateRequest request);
 
     List<SessionDTO> toDTOList(List<Session> sessions);

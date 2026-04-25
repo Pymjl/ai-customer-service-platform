@@ -209,3 +209,29 @@ fileReservedTime = 48
 brokerRole = ASYNC_MASTER
 flushDiskType = ASYNC_FLUSH
 autoCreateTopicEnable = true
+
+### PostgreSQL Schema 约定
+
+| 服务 | 数据库 | Schema | JDBC currentSchema |
+|---|---|---|---|
+| `user-service` | `aicsp_user` | `user_service` | `user_service` |
+| `biz-service` | `aicsp_biz` | `biz_service` | `biz_service` |
+
+Flyway 会通过 `spring.flyway.create-schemas=true` 自动创建业务 schema。业务表不得创建在 `public` schema 下。
+
+### MinIO Java 服务使用
+
+| 服务 | Bucket | 用途 |
+|---|---|---|
+| `user-service` | `aicsp-user` | 用户头像 |
+
+`user-service` dev 默认连接 `http://localhost:9000`，默认 AccessKey/SecretKey 为 `minioadmin/minioadmin`。如本地 MinIO 实际密码不同，请同步修改 `user-service/src/main/resources/application-dev.yml`。
+
+### 分布式 ID Worker ID
+
+| 服务 | dev 默认 `aicsp.worker-id` |
+|---|---:|
+| `user-service` | `1` |
+| `biz-service` | `2` |
+
+同一服务多实例部署时，必须为每个实例设置不同 `AICSP_WORKER_ID`。

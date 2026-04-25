@@ -8,6 +8,8 @@ import com.aicsp.user.dto.auth.CaptchaVerifyRequest;
 import com.aicsp.user.dto.auth.CaptchaVerifyResponse;
 import com.aicsp.user.dto.auth.IntrospectionResponse;
 import com.aicsp.user.dto.auth.LoginRequest;
+import com.aicsp.user.dto.auth.LogoutRequest;
+import com.aicsp.user.dto.auth.RefreshTokenRequest;
 import com.aicsp.user.dto.auth.RegisterRequest;
 import com.aicsp.user.dto.auth.TokenResponse;
 import com.aicsp.user.dto.auth.UserProfile;
@@ -57,6 +59,17 @@ public class AuthController {
     @PostMapping("/login")
     public R<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return R.ok(authService.login(request));
+    }
+
+    @PostMapping("/refresh")
+    public R<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return R.ok(authService.refresh(request));
+    }
+
+    @PostMapping("/logout")
+    public R<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return R.ok();
     }
 
     @GetMapping("/me")

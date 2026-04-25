@@ -5,6 +5,8 @@ spring:
     name: biz-service
 logging:
   config: classpath:logback-spring.xml
+  file:
+    path: biz-service/logs
 management:
   endpoints:
     web:

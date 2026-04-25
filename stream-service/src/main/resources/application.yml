@@ -5,6 +5,8 @@ spring:
     name: stream-service
 logging:
   config: classpath:logback-spring.xml
+  file:
+    path: stream-service/logs
 management:
   endpoints:
     web:

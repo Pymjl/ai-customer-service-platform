@@ -5,7 +5,7 @@ spring:
     nacos:
       discovery:
         server-addr: localhost:8848
-        namespace: dev
+        namespace: af127353-dea2-4140-90cd-01cfbe3ceff3
         username: nacos
         password: nacos
 rocketmq:
@@ -21,8 +21,7 @@ python:
     connect-timeout: 5000
     response-timeout: 310000
 stream:
+  internal-token: dev-internal-secret
   sse:
     heartbeat-interval: 15s
     max-duration: 300s
-internal:
-  token: dev-internal-secret

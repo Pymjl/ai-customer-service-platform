@@ -11,7 +11,7 @@ spring:
     nacos:
       discovery:
         server-addr: localhost:8848
-        namespace: dev
+        namespace: af127353-dea2-4140-90cd-01cfbe3ceff3
         username: nacos
         password: nacos
     gateway:

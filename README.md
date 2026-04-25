@@ -1,314 +1,228 @@
-﻿# ai-customer-service-platform
+# AI Customer Service Platform
 
-`ai-customer-service-platform` 是一个基于 Java 21、Spring Boot 3、Spring Cloud 的多模块 AI 客服平台后端工程。当前仓库已经搭好网关、用户中心、对话流服务、业务服务和公共模块的基础骨架，并预留了与 Python AI 引擎、RocketMQ、Nacos、PostgreSQL、Redis 的集成点。
+AI Customer Service Platform 是一个基于 Java 21、Spring Boot 3.5、Spring Cloud Gateway、Vue 3 的 AI 客服平台。当前项目采用多模块微服务结构，包含统一网关、用户与权限中心、流式对话服务、业务会话服务、公共模块和前端管理界面。
 
-需要先说明一个事实：从当前代码看，这个仓库更接近“可继续开发的微服务脚手架”，而不是“已经完整打通并可直接上线”的成品。README 以下内容以当前代码实现为准。
+当前仓库以本地开发环境为主，`prod` 配置暂时与 `dev` 保持一致。上线前必须替换所有本地默认密码、JWT 密钥、内部调用 token 和对象存储凭据。
 
-## 1. 项目结构
+## 项目结构
 
 ```text
 ai-customer-service-platform/
-├── pom.xml
-├── common/             # 公共常量、通用返回体、异常、事件 DTO、工具类
-├── gateway-service/    # 网关服务，负责统一入口和路由
-├── user-service/       # 用户、角色、权限、授权服务
-├── stream-service/     # 对话流服务，SSE 接口、内部查询接口、消息发布
-├── biz-service/        # 会话与消息业务服务，消费 MQ 事件
-└── docs/               # 设计文档
+├── common/             # 公共返回体、异常、请求头常量、JSON 和 ID 工具
+├── gateway-service/    # API 网关、鉴权过滤、限流、用户身份头透传
+├── user-service/       # 认证、用户、角色、权限、资源、头像上传
+├── stream-service/     # SSE 对话流、内部查询接口、RocketMQ 消息发布
+├── biz-service/        # 会话、消息、RocketMQ 消息消费
+├── frontend/           # Vue 3 + Element Plus 前端
+├── docs/               # SDD 和开发文档
+└── pom.xml             # Maven 多模块父工程
 ```
 
-## 2. 技术栈
+## 技术栈
 
-| 类别 | 技术 |
+| 层级 | 技术 |
 | --- | --- |
-| 语言与构建 | Java 21, Maven |
-| 基础框架 | Spring Boot 3.5.13, Spring Cloud 2025.0.2 |
-| 服务治理 | Nacos |
-| 网关 | Spring Cloud Gateway |
-| 安全 | Spring Security, Spring Authorization Server |
-| 数据访问 | MyBatis, Flyway, PostgreSQL |
-| 缓存 | Redis |
+| 后端语言 | Java 21 |
+| 后端框架 | Spring Boot 3.5.13, Spring Cloud 2025.0.2 |
+| 网关 | Spring Cloud Gateway WebFlux |
+| 安全 | Spring Security, 自定义 JWT access token, Redis refresh token |
+| 数据库 | PostgreSQL, Flyway, MyBatis |
+| 缓存/会话 | Redis |
+| 服务发现 | Nacos |
 | 消息队列 | RocketMQ |
-| 响应式 | WebFlux, Reactor |
-| 对象转换 | MapStruct |
-| 日志 | Logback |
+| 文件存储 | MinIO |
+| 前端 | Vue 3, Vite, TypeScript, Pinia, Element Plus |
 
-## 3. 模块职责
+## 服务端口
 
-| 模块 | 端口 | 主要职责 | 当前状态 |
-| --- | --- | --- | --- |
-| `common` | 无 | 公共常量、异常、返回体、事件 DTO、工具类 | 可复用 |
-| `gateway-service` | `18080` | 路由转发、入口拦截、请求头透传 | 已有基础路由，鉴权仍是占位实现 |
-| `user-service` | `18081` | 用户、角色、权限接口，授权服务入口 | 控制器已建，Service 多为占位实现 |
-| `stream-service` | `18082` | SSE 对话接口、内部查询接口、消息事件发布 | 主链路已搭骨架，AI 引擎调用未真正接入主流程 |
-| `biz-service` | `18083` | 会话、消息接口，消费对话完成事件 | 控制器和消费者已建，持久化逻辑仍是占位实现 |
+| 服务 | 默认端口 | 说明 |
+| --- | ---: | --- |
+| `gateway-service` | `18080` | 外部统一入口 |
+| `user-service` | `18081` | 认证、用户、RBAC |
+| `stream-service` | `18082` | 流式聊天、内部查询 |
+| `biz-service` | `18083` | 会话和消息 |
+| `frontend` | `5173` | Vite 开发服务器默认端口 |
+| Nacos | `8848` | 服务注册发现 |
+| Redis | `6379` | token、限流、缓存 |
+| RocketMQ NameServer | `9876` | 消息队列 |
+| MinIO | `9000` | 对象存储 API |
 
-## 4. 系统架构图
+## 架构图
 
-下面的图分成两层含义：
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
 
-- 实线：当前代码中已经存在明确入口或依赖关系。
-- 虚线：代码中已经预留了接口/客户端，但主流程还没有完全接上。
+actor "Browser / Client" as Client
 
-```mermaid
-flowchart LR
-    C[客户端]
+node "Frontend\nVue 3" as FE
+node "gateway-service\n:18080" as Gateway
+node "user-service\n:18081" as User
+node "stream-service\n:18082" as Stream
+node "biz-service\n:18083" as Biz
+node "common" as Common
 
-    subgraph Java服务
-        G[gateway-service<br/>:18080]
-        U[user-service<br/>:18081]
-        S[stream-service<br/>:18082]
-        B[biz-service<br/>:18083]
-        CM[common]
-    end
+database "PostgreSQL\naicsp_user" as UserDB
+database "PostgreSQL\naicsp_biz" as BizDB
+database "Redis" as Redis
+queue "RocketMQ" as MQ
+cloud "Nacos" as Nacos
+cloud "MinIO" as Minio
+cloud "Python AI Engine\n可选/预留" as Python
 
-    subgraph 基础设施
-        NC[Nacos]
-        RU[(Redis)]
-        DBU[(PostgreSQL: aicsp_user)]
-        DBB[(PostgreSQL: aicsp_biz)]
-        MQ[(RocketMQ)]
-        PY[Python AI 引擎]
-    end
+Client --> FE
+FE --> Gateway : HTTP / API
 
-    C --> G
-    G --> U
-    G --> S
-    G --> B
+Gateway --> User : /api/auth/**\n/api/users/**\n/api/roles/**\n/api/resources/**
+Gateway --> Stream : /api/chat/**
+Gateway --> Biz : /api/sessions/**\n/api/messages/**
 
-    U --> DBU
-    U --> RU
-    U --> NC
+Gateway --> Redis : rate limit
+Gateway --> User : introspect / authorize
+Gateway --> Nacos
 
-    B --> DBB
-    B --> RU
-    B --> NC
-    B --> MQ
+User --> UserDB
+User --> Redis : refresh token
+User --> Minio : avatar
+User --> Nacos
 
-    S --> MQ
-    S --> NC
-    S -. 预留调用 .-> PY
+Stream --> MQ : message completed event
+Stream --> Python : reserved WebClient
+Stream --> Nacos
 
-    G --> RU
-    G --> NC
+Biz --> BizDB
+Biz --> Redis
+Biz --> MQ : consume event
+Biz --> Nacos
 
-    CM -. 公共依赖 .-> G
-    CM -. 公共依赖 .-> U
-    CM -. 公共依赖 .-> S
-    CM -. 公共依赖 .-> B
+Common ..> Gateway
+Common ..> User
+Common ..> Stream
+Common ..> Biz
+@enduml
 ```
 
-## 5. 核心数据流图
+## 认证与授权数据流
 
-### 5.1 当前对话主链路
+当前认证采用 access token + refresh token：
 
-这是当前代码里最接近“完整链路”的部分，但仍然是简化版实现。
+- access token：JWT，默认有效期 `900` 秒，由 `user-service` 签发，网关通过 `/api/auth/introspect` 和 `/api/auth/authorize` 校验。
+- refresh token：不透明随机 token，默认有效期 `259200` 秒，服务端仅在 Redis 中保存 hash；刷新时消费旧 refresh token 并签发新 token。
+- 网关鉴权通过后会向下游写入 `X-User-Id`、`X-Tenant-Id`、`X-User-Roles`、`X-Internal-Token`。
+- `user-service` 的非公开接口只接受带正确 `X-Internal-Token` 的网关内部请求，避免绕过网关访问。
 
-```mermaid
-sequenceDiagram
-    participant Client as 客户端
-    participant Gateway as gateway-service
-    participant Stream as stream-service
-    participant MQ as RocketMQ
-    participant Biz as biz-service
+```plantuml
+@startuml
+actor Client
+participant "gateway-service" as Gateway
+participant "user-service" as User
+database Redis
 
-    Client->>Gateway: POST /api/chat/stream + Bearer Token
-    Gateway->>Gateway: 检查 Authorization 是否以 Bearer 开头
-    Gateway->>Gateway: 注入固定用户头\nX-User-Id=stub-user\nX-Tenant-Id=stub-tenant
-    Gateway->>Stream: 转发请求
-    Stream->>Stream: 生成 traceId，封装 MessageCompletedEvent
-    Stream-->>Client: 返回单条 SSE message 事件
-    Stream->>MQ: 发布 chat-message-completed
-    MQ-->>Biz: 推送消息完成事件
-    Biz->>Biz: ensureSession / saveCompletedMessage
-    Note over Biz: 当前实现里这两步仍是占位逻辑
+Client -> User : POST /api/auth/login\nusername/password/captchaToken
+User -> User : verify credentials
+User -> User : create JWT accessToken
+User -> Redis : SET refreshTokenHash TTL=3d
+User --> Client : accessToken + refreshToken + expiresIn + profile
+
+Client -> Gateway : API request\nAuthorization: Bearer accessToken
+Gateway -> User : POST /api/auth/introspect
+User -> User : verify JWT signature and exp
+User --> Gateway : active + user profile
+Gateway -> User : POST /api/auth/authorize
+User --> Gateway : allowed true/false
+Gateway -> Gateway : inject identity headers
+Gateway --> Client : proxied API response
+
+Client -> User : POST /api/auth/refresh\nrefreshToken
+User -> Redis : GETDEL old refresh token
+User -> User : compare hash
+User -> Redis : SET new refresh token hash TTL=3d
+User --> Client : new accessToken + new refreshToken
+
+Client -> User : POST /api/auth/logout\nrefreshToken
+User -> Redis : delete refresh token
+User --> Client : success
+@enduml
 ```
 
-### 5.2 预留的内部数据查询链路
+## 对话数据流
 
-`stream-service` 已提供 `/internal/{functionName}` 入口，给 Python 引擎或其他内部调用方访问。
+```plantuml
+@startuml
+actor Client
+participant "gateway-service" as Gateway
+participant "stream-service" as Stream
+queue RocketMQ
+participant "biz-service" as Biz
+database "PostgreSQL aicsp_biz" as BizDB
 
-```mermaid
-sequenceDiagram
-    participant Engine as Python 引擎/内部调用方
-    participant Stream as stream-service
-    participant Internal as InternalQueryService
-    participant Target as order/logistics/crm 子服务
-
-    Engine->>Stream: GET /internal/{functionName}\nX-Internal-Token
-    Stream->>Stream: 校验内部令牌
-    Stream->>Internal: 根据 functionName 路由
-    Internal->>Target: 调用 order/logistics/crm 查询实现
-    Target-->>Internal: 返回查询结果
-    Internal-->>Stream: 标准化 Map 数据
-    Stream-->>Engine: R<Map<String, Object>>
+Client -> Gateway : POST /api/chat/stream\nBearer accessToken
+Gateway -> Gateway : auth + rate limit
+Gateway -> Stream : forward request + identity headers
+Stream -> Stream : create SSE events
+Stream --> Client : text/event-stream
+Stream -> RocketMQ : MessageCompletedEvent
+RocketMQ -> Biz : consume event
+Biz -> BizDB : persist session/message
+@enduml
 ```
 
-## 6. 当前代码现状说明
+## 本地环境准备
 
-这一节很关键，建议在真正联调或部署前先看完。
+建议版本：
 
-1. `gateway-service` 当前并没有真正做 JWT 验签。它只检查请求头里是否存在 `Bearer ` 前缀，然后写入固定的 `stub-user`、`stub-tenant`、`ROLE_USER` 头。
-2. `stream-service` 的 `ChatStreamServiceImpl` 当前没有真正调用 `PythonEngineClient`，而是直接把用户输入原样作为 SSE 消息返回，并把同样的内容写进消息完成事件。
-3. `user-service` 和 `biz-service` 的多个 `ServiceImpl` 仍是占位实现，例如列表接口直接返回空集合，创建/保存方法还没有真正写库。
-4. `stream-service` 中存在两套内部 token 配置思路：`internal.token` 与 `stream.internalToken`。当前真正被 `SecurityConfig` 使用的是 `internal.token`。
-5. `stream-service` 的 `InternalTokenWebFilter` 依赖 `StreamModuleProperties`，但当前启动类没有显式注册这个配置属性类。按现状看，这一部分存在启动失败或配置不生效的风险，正式启动前应先核对。
-6. `gateway-service` 中存在 `GatewayModuleProperties`，但当前主流程没有看到实际使用点。
+| 依赖 | 建议版本 |
+| --- | --- |
+| JDK | 21 |
+| Maven | 3.9+ |
+| Node.js | 20+ |
+| PostgreSQL | 15+ / 17+ |
+| Redis | 7.x |
+| Nacos | 2.x |
+| RocketMQ | 5.x |
+| MinIO | 当前稳定版 |
 
-如果你的目标是“先跑通一个最小骨架”，这个仓库是够用的；如果目标是“可联调、可演示、可上线”，还需要继续补完整体业务实现。
+需要准备两个数据库：
 
-## 7. 本地启动前准备
+```sql
+CREATE DATABASE aicsp_user;
+CREATE DATABASE aicsp_biz;
+```
 
-### 7.1 必备环境
+当前 Flyway 使用 schema：
 
-| 组件 | 建议版本 | 说明 |
-| --- | --- | --- |
-| JDK | 21 | 项目根 POM 固定为 Java 21 |
-| Maven | 3.9+ | 多模块构建 |
-| PostgreSQL | 17+ | `user-service` 和 `biz-service` 依赖，dev 环境使用 pgvector/pgvector:pg17 |
-| Redis | 7.x | 网关、用户、业务服务依赖 |
-| Nacos | 2.x | 网关路由使用 `lb://`，本地也建议启用服务注册发现 |
-| RocketMQ | 5.x | `stream-service` 生产消息，`biz-service` 消费消息 |
-| Python 引擎 | 可选但建议准备 | 当前主流程未真正调用，但已预留配置与客户端 |
+- `user-service`：`user_service`
+- `biz-service`：`biz_service`
 
-### 7.2 推荐启动顺序
+服务启动时会自动创建 schema 并执行迁移。
+
+## 启动顺序
+
+推荐顺序：
 
 1. PostgreSQL
 2. Redis
 3. Nacos
 4. RocketMQ
-5. `user-service`
-6. `biz-service`
-7. `stream-service`
-8. `gateway-service`
+5. MinIO
+6. `user-service`
+7. `biz-service`
+8. `stream-service`
+9. `gateway-service`
+10. `frontend`
 
-如果你后续要接 Python AI 引擎，再单独启动 Python 服务。
+## 后端启动
 
-## 8. 各服务启动前需要修改哪些配置
+在项目根目录执行。
 
-下面只列“启动前最应该核对或修改”的项。
-
-### 8.1 gateway-service
-
-配置文件：
-
-- `gateway-service/src/main/resources/application-dev.yml`
-- `gateway-service/src/main/resources/application-prod.yml`
-
-需要核对：
-
-| 配置项 | dev 默认值 | 是否必须修改 | 说明 |
-| --- | --- | --- | --- |
-| `server.port` | `18080` | 按需 | 端口冲突时修改 |
-| `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
-| `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
-| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
-| `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
-| `spring.cloud.nacos.discovery.namespace` | `dev` / `prod` | 建议核对 | 命名空间要和服务注册一致 |
-| `spring.cloud.gateway.routes[*]` | 已内置 | 按需 | 路由前缀、目标服务名如有变化需要同步修改 |
-
-补充说明：
-
-- 当前网关路由目标使用 `lb://user-service`、`lb://stream-service`、`lb://biz-service`，因此本地联调通常离不开 Nacos。
-- 当前鉴权逻辑仍是占位实现，如果要接真实 OAuth2/JWT，这部分代码还需要补完。
-
-### 8.2 user-service
-
-配置文件：
-
-- `user-service/src/main/resources/application-dev.yml`
-- `user-service/src/main/resources/application-prod.yml`
-
-需要核对：
-
-| 配置项 | dev 默认值 | 是否必须修改 | 说明 |
-| --- | --- | --- | --- |
-| `server.port` | `18081` | 按需 | 端口冲突时修改 |
-| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_user` | 通常需要 | 数据库地址、库名 |
-| `spring.datasource.username` | `postgres` | 通常需要 | 数据库用户名 |
-| `spring.datasource.password` | `123456` | 通常需要 | dev 环境数据库密码 |
-| `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
-| `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
-| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
-| `spring.data.redis.database` | `1` | 建议核对 | Redis DB 编号 |
-| `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
-| `spring.cloud.nacos.discovery.namespace` | `dev` / `prod` | 建议核对 | 命名空间 |
-| `spring.flyway.enabled` | `true` | 建议保留 | 启动时自动迁移用户库 |
-
-补充说明：
-
-- `user-service` 承担授权服务角色，但当前仓库里还没有完整的客户端注册、JWK 发布、JWT 签发联调闭环说明，真正接 OAuth2 前需要继续补。
-
-### 8.3 biz-service
-
-配置文件：
-
-- `biz-service/src/main/resources/application-dev.yml`
-- `biz-service/src/main/resources/application-prod.yml`
-
-需要核对：
-
-| 配置项 | dev 默认值 | 是否必须修改 | 说明 |
-| --- | --- | --- | --- |
-| `server.port` | `18083` | 按需 | 端口冲突时修改 |
-| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_biz` | 通常需要 | 业务库地址、库名 |
-| `spring.datasource.username` | `postgres` | 通常需要 | 数据库用户名 |
-| `spring.datasource.password` | `123456` | 通常需要 | dev 环境数据库密码 |
-| `spring.data.redis.host` | `localhost` | 视环境而定 | Redis 地址 |
-| `spring.data.redis.port` | `6379` | 视环境而定 | Redis 端口 |
-| `spring.data.redis.password` | `123456` | 通常需要 | dev Redis 已开启认证 |
-| `spring.data.redis.database` | `2` | 建议核对 | Redis DB 编号 |
-| `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
-| `rocketmq.name-server` | `localhost:9876` | 通常需要 | RocketMQ NameServer |
-| `rocketmq.consumer.group` | `biz-service-consumer` | 一般保留 | 消费组名称 |
-| `spring.flyway.enabled` | `true` | 建议保留 | 启动时自动迁移业务库 |
-
-补充说明：
-
-- 当前 `MessageCompletedConsumer` 已接入 RocketMQ 消费，但 `ensureSession` 和 `saveCompletedMessage` 还未真正持久化。
-
-### 8.4 stream-service
-
-配置文件：
-
-- `stream-service/src/main/resources/application-dev.yml`
-- `stream-service/src/main/resources/application-prod.yml`
-
-需要核对：
-
-| 配置项 | dev 默认值 | 是否必须修改 | 说明 |
-| --- | --- | --- | --- |
-| `server.port` | `18082` | 按需 | 端口冲突时修改 |
-| `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | 通常需要 | Nacos 地址 |
-| `rocketmq.name-server` | `localhost:9876` | 通常需要 | RocketMQ NameServer |
-| `rocketmq.producer.group` | `stream-service-producer` | 一般保留 | 生产组名称 |
-| `python.engine.base-url` | `http://localhost:8000` | 建议修改/核对 | Python 引擎地址 |
-| `python.engine.max-connections` | `200` | 按需 | WebClient 连接池上限 |
-| `python.engine.response-timeout` | `310000` | 按需 | SSE/长请求超时 |
-| `stream.sse.heartbeat-interval` | `15s` | 按需 | SSE 心跳间隔 |
-| `stream.sse.max-duration` | `300s` | 按需 | 单次流式响应最大时长 |
-| `internal.token` | `dev-internal-secret` | 必须修改 | 内部接口令牌，生产必须替换 |
-
-补充说明：
-
-- 当前真正被 `SecurityConfig` 读取的是 `internal.token`。
-- 代码里还存在 `stream.internalToken` 对应的配置类，但这套配置目前没有形成稳定、统一的生效链路，建议先统一成一套再部署。
-
-## 9. 构建与运行
-
-### 9.1 全量构建
+构建全部模块：
 
 ```bash
 mvn clean package -P dev
 ```
 
-生产构建：
-
-```bash
-mvn clean package -P prod -DskipTests
-```
-
-### 9.2 单服务运行示例
+运行单个服务：
 
 ```bash
 mvn -pl user-service spring-boot:run
@@ -326,31 +240,230 @@ mvn -pl stream-service spring-boot:run
 mvn -pl gateway-service spring-boot:run
 ```
 
-## 10. 常用接口入口
+也可以先打包，再运行对应 jar：
 
-| 服务 | 路径 | 说明 |
+```bash
+java -jar user-service/target/user-service-1.0.0-SNAPSHOT.jar
+```
+
+## 前端启动
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+前端环境变量示例：`frontend/.env.example`
+
+```env
+VITE_API_BASE_URL=/api
+VITE_API_PROXY_TARGET=http://localhost:18080
+```
+
+本地开发时，前端通过 Vite 代理访问网关。生产部署时建议将 `VITE_API_BASE_URL` 指向实际网关入口。
+
+## 关键配置项
+
+### gateway-service
+
+文件：
+
+- `gateway-service/src/main/resources/application-dev.yml`
+- `gateway-service/src/main/resources/application-prod.yml`
+
+| 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `gateway-service` | `/gateway/ping` | 网关探活接口 |
-| `gateway-service` | `/api/users/**` | 转发到 `user-service` |
-| `gateway-service` | `/api/roles/**` | 转发到 `user-service` |
-| `gateway-service` | `/api/permissions/**` | 转发到 `user-service` |
-| `gateway-service` | `/api/chat/**` | 转发到 `stream-service` |
-| `gateway-service` | `/api/sessions/**` | 转发到 `biz-service` |
-| `gateway-service` | `/api/messages/**` | 转发到 `biz-service` |
-| `stream-service` | `/internal/{functionName}` | 内部查询接口 |
+| `server.port` | `18080` | 网关端口 |
+| `spring.data.redis.host` | `localhost` | Redis 地址 |
+| `spring.data.redis.port` | `6379` | Redis 端口 |
+| `spring.data.redis.password` | `123456` | Redis 密码 |
+| `spring.cloud.nacos.discovery.server-addr` | `localhost:8848` | Nacos 地址 |
+| `spring.cloud.nacos.discovery.namespace` | `dev` | Nacos 命名空间 |
+| `gateway.security.introspect-uri` | `http://localhost:18081/api/auth/introspect` | token 内省接口 |
+| `gateway.security.authorize-uri` | `http://localhost:18081/api/auth/authorize` | RBAC 授权接口 |
+| `gateway.security.internal-token` | 本地固定值 | 网关转发给下游的内部 token |
+| `gateway.security.rate-limit-per-minute` | `120` | 每分钟限流阈值 |
+| `gateway.security.whitelist-prefixes` | `/api/auth/`, `/oauth2/`, `/actuator/health` | 免鉴权路径前缀 |
 
-## 11. 建议的下一步
+生产注意：`internal-token` 必须替换为高强度随机值，并与 `user-service` 的 `aicsp.security.internal-token` 保持一致。
 
-如果你准备继续把这个项目补成可联调版本，优先顺序建议如下：
+### user-service
 
-1. 先修正 `stream-service` 的配置绑定问题，统一内部 token 配置来源。
-2. 补齐 `user-service`、`biz-service` 的数据库读写逻辑。
-3. 让 `stream-service` 主链路真正调用 `PythonEngineClient`。
-4. 把 `gateway-service` 的鉴权从占位逻辑升级为真实 JWT 验签和用户信息透传。
-5. 补充每个服务的集成测试和最小联调脚本。
+文件：
 
-## 12. 参考文档
+- `user-service/src/main/resources/application-dev.yml`
+- `user-service/src/main/resources/application-prod.yml`
 
-- `docs/sdd/初始化Java服务.md`
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `server.port` | `18081` | 用户服务端口 |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_user?currentSchema=user_service` | 用户库 |
+| `spring.datasource.username` | `postgres` | 数据库用户名 |
+| `spring.datasource.password` | `123456` | 数据库密码 |
+| `spring.data.redis.database` | `1` | Redis DB |
+| `spring.flyway.enabled` | `true` | 自动迁移 |
+| `aicsp.admin.username` | `admin` | 默认管理员用户名 |
+| `aicsp.admin.password` | `123456` | 默认管理员密码，本地开发用 |
+| `aicsp.jwt.secret` | 本地固定值 | JWT HS256 签名密钥，至少 32 字节 |
+| `aicsp.jwt.ttl-seconds` | `900` | access token 有效期 |
+| `aicsp.jwt.refresh-ttl-seconds` | `259200` | refresh token 有效期 |
+| `aicsp.jwt.refresh-token-bytes` | `32` | refresh token 随机字节数 |
+| `aicsp.security.internal-token` | 本地固定值 | 接受网关内部调用的 token |
+| `aicsp.resource.project-root` | 本地项目路径 | 资源同步扫描根目录 |
+| `aicsp.minio.endpoint` | `http://localhost:9000` | MinIO 地址 |
+| `aicsp.minio.access-key` | `minioadmin` | MinIO access key |
+| `aicsp.minio.secret-key` | `minioadmin123` | MinIO secret key |
+| `aicsp.minio.bucket` | `aicsp-user` | 用户头像 bucket |
 
-这个文档比 README 更详细，适合继续做设计或补实现时参考。
+生产注意：
+
+- 不要使用默认管理员密码。
+- 不要使用仓库中的 JWT secret。
+- 不要使用仓库中的内部 token。
+- MinIO 凭据必须替换。
+
+### stream-service
+
+文件：
+
+- `stream-service/src/main/resources/application-dev.yml`
+- `stream-service/src/main/resources/application-prod.yml`
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `server.port` | `18082` | 流式服务端口 |
+| `rocketmq.name-server` | `localhost:9876` | RocketMQ NameServer |
+| `rocketmq.producer.group` | `stream-service-producer` | 生产者组 |
+| `python.engine.base-url` | `http://localhost:8000` | Python AI 引擎地址 |
+| `python.engine.max-connections` | `200` | WebClient 最大连接数 |
+| `python.engine.response-timeout` | `310000` | 响应超时 |
+| `stream.sse.heartbeat-interval` | `15s` | SSE 心跳间隔 |
+| `stream.sse.max-duration` | `300s` | SSE 最大持续时间 |
+| `stream.internal-token` | `change-me` 或配置值 | 内部接口 token |
+
+说明：当前 `stream-service` 使用 `StreamModuleProperties` 读取 `stream.internal-token`。请确保配置文件中使用 `stream.internal-token`，不要再使用旧的 `internal.token`。
+
+### biz-service
+
+文件：
+
+- `biz-service/src/main/resources/application-dev.yml`
+- `biz-service/src/main/resources/application-prod.yml`
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `server.port` | `18083` | 业务服务端口 |
+| `spring.datasource.url` | `jdbc:postgresql://localhost:5432/aicsp_biz?currentSchema=biz_service` | 业务库 |
+| `spring.datasource.username` | `postgres` | 数据库用户名 |
+| `spring.datasource.password` | `123456` | 数据库密码 |
+| `spring.data.redis.database` | `2` | Redis DB |
+| `spring.flyway.enabled` | `true` | 自动迁移 |
+| `rocketmq.name-server` | `localhost:9876` | RocketMQ NameServer |
+| `rocketmq.consumer.group` | `biz-service-consumer` | 消费者组 |
+| `aicsp.worker-id` | `2` | 分布式 ID worker id |
+
+## 主要 API
+
+所有业务接口建议通过网关访问：`http://localhost:18080`。
+
+### 认证
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/auth/captcha` | 获取滑块验证码 |
+| `POST` | `/api/auth/captcha/verify` | 校验滑块验证码 |
+| `POST` | `/api/auth/register` | 注册 |
+| `POST` | `/api/auth/register-with-avatar` | 带头像注册 |
+| `POST` | `/api/auth/login` | 登录，返回 access token 和 refresh token |
+| `POST` | `/api/auth/refresh` | refresh token 轮换刷新 |
+| `POST` | `/api/auth/logout` | 登出并吊销 refresh token |
+| `GET` | `/api/auth/me` | 当前用户信息 |
+| `POST` | `/api/auth/introspect` | 网关内省 access token |
+| `POST` | `/api/auth/authorize` | 网关 RBAC 授权 |
+
+### 用户与权限
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/users` | 用户列表 |
+| `POST` | `/api/users` | 创建用户 |
+| `GET` | `/api/users/{userId}` | 用户详情 |
+| `PUT` | `/api/users/{userId}` | 更新用户 |
+| `PUT` | `/api/users/{userId}/avatar` | 更新头像 |
+| `GET` | `/api/users/{userId}/roles` | 用户角色 |
+| `PUT` | `/api/users/{userId}/roles` | 分配用户角色 |
+| `GET` | `/api/roles` | 角色列表 |
+| `POST` | `/api/roles` | 创建角色 |
+| `GET` | `/api/resources` | API 资源列表 |
+| `GET` | `/api/resources/tree` | API 资源树 |
+| `POST` | `/api/resources/sync` | 从代码同步 API 资源 |
+| `GET` | `/api/resources/roles/{roleId}` | 角色资源 |
+| `PUT` | `/api/resources/roles/{roleId}` | 分配角色资源 |
+| `GET` | `/api/permissions` | 权限列表 |
+
+### 对话与业务
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/chat/stream` | SSE 流式聊天 |
+| `GET` | `/api/sessions` | 会话列表 |
+| `POST` | `/api/sessions` | 创建会话 |
+| `GET` | `/api/messages` | 消息列表 |
+| `GET` | `/internal/{functionName}` | stream-service 内部查询接口 |
+
+## 测试与验证
+
+后端相关模块：
+
+```bash
+mvn -pl common,user-service,gateway-service,stream-service -am test
+```
+
+全量后端：
+
+```bash
+mvn test
+```
+
+前端：
+
+```bash
+cd frontend
+npm run type-check
+npm run build
+```
+
+## 部署建议
+
+本项目当前还处于本地开发阶段。部署到服务器时建议按以下顺序处理：
+
+1. 使用独立 PostgreSQL、Redis、Nacos、RocketMQ、MinIO 实例。
+2. 为每个服务建立独立配置文件或环境变量注入机制。
+3. 替换所有默认密码、JWT secret、internal token、MinIO 密钥。
+4. 禁止公网直接访问 `user-service`、`stream-service`、`biz-service`，只暴露 `gateway-service` 和前端。
+5. 在网关或反向代理层启用 HTTPS。
+6. Redis 开启认证；生产建议使用专用网络和访问控制。
+7. 调整 `aicsp.resource.project-root` 为实际部署路径，或在生产关闭自动资源同步定时任务。
+8. 使用进程管理工具或容器编排启动服务，例如 systemd、Docker Compose、Kubernetes。
+
+## 生产安全检查清单
+
+- [ ] `aicsp.admin.password` 已替换。
+- [ ] `aicsp.jwt.secret` 已替换为高强度密钥。
+- [ ] `gateway.security.internal-token` 与 `aicsp.security.internal-token` 已替换且一致。
+- [ ] `stream.internal-token` 已替换。
+- [ ] 数据库密码已替换。
+- [ ] Redis 密码已替换。
+- [ ] MinIO 凭据已替换。
+- [ ] 只暴露网关和前端。
+- [ ] 启用 HTTPS。
+- [ ] 日志目录、上传目录、对象存储 bucket 已准备。
+
+## 当前已知注意事项
+
+- 当前 `prod` 配置暂时与 `dev` 保持一致，仅适合本地开发或内网联调。
+- refresh token 依赖 Redis；Redis 不可用会导致登录、刷新和登出不可用。
+- access token 过期后，前端会用 refresh token 调用 `/api/auth/refresh`，成功后自动重试一次原请求。
+- `stream-service` 的 Python 引擎调用已有客户端配置，但实际业务流是否完全依赖 Python 引擎需要按后续业务实现继续确认。
+- 前端 `vite build` 可能出现 chunk 超过 500 kB 的警告，不影响构建产物生成。

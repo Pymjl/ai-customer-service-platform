@@ -5,7 +5,9 @@ spring:
     nacos:
       discovery:
         server-addr:
-        namespace: prod
+        namespace:
+        username:
+        password:
 rocketmq:
   name-server:
   producer:
@@ -19,8 +21,7 @@ python:
     connect-timeout: 5000
     response-timeout: 310000
 stream:
+  internal-token:
   sse:
     heartbeat-interval: 15s
     max-duration: 300s
-internal:
-  token:

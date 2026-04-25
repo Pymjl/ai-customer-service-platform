@@ -1,8 +1,11 @@
 package com.aicsp.user.service.impl;
 
 import com.aicsp.common.util.DistributedIdUtils;
+import com.aicsp.user.config.JwtProperties;
 import com.aicsp.user.dto.auth.IntrospectionResponse;
 import com.aicsp.user.dto.auth.LoginRequest;
+import com.aicsp.user.dto.auth.LogoutRequest;
+import com.aicsp.user.dto.auth.RefreshTokenRequest;
 import com.aicsp.user.dto.auth.RegisterRequest;
 import com.aicsp.user.dto.auth.TokenResponse;
 import com.aicsp.user.dto.auth.UserProfile;
@@ -14,6 +17,7 @@ import com.aicsp.user.mapper.RoleMapper;
 import com.aicsp.user.mapper.UserMapper;
 import com.aicsp.user.mapper.UserRoleMapper;
 import com.aicsp.user.security.JwtTokenService;
+import com.aicsp.user.security.RefreshTokenService;
 import com.aicsp.user.service.AuthService;
 import com.aicsp.user.service.CaptchaService;
 import com.aicsp.user.service.FileStorageService;
@@ -34,9 +38,11 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final CaptchaService captchaService;
     private final JwtTokenService jwtTokenService;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtProperties jwtProperties;
     private final FileStorageService fileStorageService;
 
-    public AuthServiceImpl(UserMapper userMapper, RoleMapper roleMapper, UserRoleMapper userRoleMapper, ApiResourceMapper apiResourceMapper, PasswordEncoder passwordEncoder, CaptchaService captchaService, JwtTokenService jwtTokenService, FileStorageService fileStorageService) {
+    public AuthServiceImpl(UserMapper userMapper, RoleMapper roleMapper, UserRoleMapper userRoleMapper, ApiResourceMapper apiResourceMapper, PasswordEncoder passwordEncoder, CaptchaService captchaService, JwtTokenService jwtTokenService, RefreshTokenService refreshTokenService, JwtProperties jwtProperties, FileStorageService fileStorageService) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
@@ -44,6 +50,8 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.captchaService = captchaService;
         this.jwtTokenService = jwtTokenService;
+        this.refreshTokenService = refreshTokenService;
+        this.jwtProperties = jwtProperties;
         this.fileStorageService = fileStorageService;
     }
 
@@ -56,8 +64,24 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("账户名或密码错误");
         }
         List<String> roles = roleMapper.selectByUserId(user.getUserId()).stream().map(Role::getRoleCode).toList();
-        String token = jwtTokenService.createToken(user.getUserId(), user.getTenantId(), user.getUsername(), roles);
-        return new TokenResponse(token, "Bearer", 7200, toProfile(user, roles));
+        return issueToken(user, roles);
+    }
+
+    @Override
+    public TokenResponse refresh(RefreshTokenRequest request) {
+        String userId = refreshTokenService.consume(request.getRefreshToken());
+        User user = userMapper.selectByUserId(userId);
+        if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+            refreshTokenService.revokeAll(userId);
+            throw new IllegalArgumentException("invalid refresh token");
+        }
+        List<String> roles = roleMapper.selectByUserId(user.getUserId()).stream().map(Role::getRoleCode).toList();
+        return issueToken(user, roles);
+    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        refreshTokenService.revoke(request.getRefreshToken());
     }
 
     @Override
@@ -163,6 +187,12 @@ public class AuthServiceImpl implements AuthService {
 
     private UserProfile toProfile(User user, List<String> roles) {
         return new UserProfile(user.getUserId(), user.getTenantId(), user.getUsername(), user.getAvatarPath(), user.getGender(), user.getRealName(), user.getAge(), user.getEmail(), user.getPhone(), user.getAddress(), roles);
+    }
+
+    private TokenResponse issueToken(User user, List<String> roles) {
+        String accessToken = jwtTokenService.createToken(user.getUserId(), user.getTenantId(), user.getUsername(), roles);
+        String refreshToken = refreshTokenService.create(user.getUserId());
+        return new TokenResponse(accessToken, refreshToken, "Bearer", jwtProperties.getTtlSeconds(), toProfile(user, roles));
     }
 
     private boolean matchPath(String pattern, String path) {

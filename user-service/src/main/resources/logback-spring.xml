@@ -3,8 +3,7 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="application"/>
-    <springProperty scope="context" name="LOG_HOME" source="logging.file.path" defaultValue="logs"/>
-    <property name="SERVICE_LOG_HOME" value="${LOG_HOME}/${APP_NAME}"/>
+    <springProperty scope="context" name="LOG_HOME" source="logging.file.path" defaultValue="user-service/logs"/>
     <property name="CONSOLE_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %highlight(%-5level) %clr([%X{traceId:-}]){cyan} %clr(%logger{36}){blue} %clr(-){faint} %msg%n%wEx"/>
     <property name="FILE_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{64} - %msg%n%wEx"/>
 
@@ -16,14 +15,14 @@
     </appender>
 
     <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${SERVICE_LOG_HOME}/app.log</file>
+        <file>${LOG_HOME}/app.log</file>
         <append>true</append>
         <encoder>
             <pattern>${FILE_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${SERVICE_LOG_HOME}/app.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>${LOG_HOME}/app.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>30</maxHistory>
             <totalSizeCap>10GB</totalSizeCap>
@@ -31,7 +30,7 @@
     </appender>
 
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${SERVICE_LOG_HOME}/error.log</file>
+        <file>${LOG_HOME}/error.log</file>
         <append>true</append>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
@@ -41,7 +40,7 @@
             <charset>UTF-8</charset>
         </encoder>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${SERVICE_LOG_HOME}/error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>${LOG_HOME}/error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>60</maxHistory>
             <totalSizeCap>10GB</totalSizeCap>

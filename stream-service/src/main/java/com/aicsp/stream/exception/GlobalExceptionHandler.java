@@ -27,6 +27,11 @@ public class GlobalExceptionHandler {
         return Mono.just(R.fail(ResultCode.BAD_REQUEST.getCode(), e.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public Mono<R<?>> handleIllegalArgumentException(IllegalArgumentException e) {
+        return Mono.just(R.fail(ResultCode.BAD_REQUEST.getCode(), e.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public Mono<R<?>> handleException(Exception e) {
         return Mono.just(R.fail(ResultCode.SYSTEM_ERROR));

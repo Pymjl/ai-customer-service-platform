@@ -1,4 +1,4 @@
-﻿# ai-customer-service-platform — 软件设计文档（SDD）
+# ai-customer-service-platform — 软件设计文档（SDD）
 
 **版本**：2.0.0
 **日期**：2026-04-22
@@ -91,13 +91,14 @@ service   service   service   service
 sequenceDiagram
     participant C as 客户端
     participant G as gateway-service
+    participant U as user-service
     participant S as stream-service
     participant P as Python 引擎
     participant MQ as RocketMQ
     participant B as biz-service
 
     C->>G: POST /api/chat/stream (Bearer JWT)
-    G->>G: 基于缓存 JWK 本地验签 JWT
+    G->>U: 调用 introspect/authorize 校验 Token 与路径权限
     G->>G: 清理外部同名身份头并注入 X-User-Id / X-Tenant-Id / X-Trace-Id
     G->>S: 转发请求
     S->>P: 转发 EngineRequest（SSE）
@@ -210,7 +211,7 @@ ai-customer-service-platform/
 │       │   │   └── com/aicsp/gateway/
 │       │   │       ├── GatewayApplication.java
 │       │   │       ├── config/
-│       │   │       │   ├── RouteConfig.java             # 路由规则、限流过滤器、屏蔽 /internal/**
+│       │   │       │   ├── RouteConfig.java             # 预留路由配置扩展点
 │       │   │       │   ├── SecurityConfig.java
 │       │   │       │   └── RedisConfig.java
 │       │   │       ├── filter/
@@ -868,30 +869,32 @@ public class JsonUtils {
 | 职责 | 说明 |
 |------|------|
 | 路由转发 | 路由到 user-service / stream-service / biz-service |
-| Token 验证 | 基于 user-service 发布的 JWK Set 在网关本地校验 JWT，避免逐请求调用 introspect |
+| Token 验证 | `AuthGlobalFilter` 调用 user-service 的 `/api/auth/introspect` 校验 Bearer JWT 有效性 |
+| 权限校验 | `AuthGlobalFilter` 调用 user-service 的 `/api/auth/authorize` 校验当前用户是否允许访问目标路径 |
 | 身份注入 | 先清理外部同名身份头，再注入 `X-User-Id`、`X-Tenant-Id`、`X-User-Roles` |
 | 链路追踪 | 使用 `TraceIdUtils` 生成并透传 `X-Trace-Id` |
-| 全局限流 | Redis 令牌桶限流，由 `RouteConfig` 以代码方式配置，按路由维度设置速率 |
+| 全局限流 | Redis 计数限流，由 `AuthGlobalFilter` 按 `principal + path + minute` 维度限制请求数 |
 | SSE 透传 | `text/event-stream` 响应直接透传，不缓冲；连接生命周期由 stream-service 心跳与最大会话时长控制 |
-| 内部接口屏蔽 | `RouteConfig` 对外部入站的 `/internal/**` 直接返回 404 |
+| 内部接口屏蔽 | `AuthGlobalFilter` 对外部入站的 `/internal/**` 直接返回 404 |
 
 ### 10.2 核心依赖
 
 ```xml
-spring-cloud-starter-gateway
+spring-cloud-starter-gateway-server-webflux
 spring-boot-starter-oauth2-resource-server
 spring-cloud-starter-loadbalancer
 spring-cloud-starter-alibaba-nacos-discovery
 spring-boot-starter-data-redis-reactive
 spring-boot-starter-actuator
+org.projectlombok:lombok
 com.aicsp:common
 ```
 
 ### 10.3 GlobalExceptionHandler（WebFlux）
 
 ```java
+@Slf4j
 @RestControllerAdvice
-@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
@@ -906,6 +909,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Mono<R<?>> handleException(Exception e) {
+        log.error("Unhandled gateway exception", e);
         return Mono.just(R.fail(ResultCode.SYSTEM_ERROR));
     }
 }
@@ -921,6 +925,8 @@ spring:
     name: gateway-service
 logging:
   config: classpath:logback-spring.xml
+  file:
+    path: logs
 management:
   endpoints:
     web:
@@ -945,35 +951,46 @@ spring:
       discovery:
         server-addr: localhost:8848
         namespace: dev
+        username: nacos
+        password: nacos
     gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/api/users/**​, /api/roles/​**, /api/permissions/**​, /oauth2/​**
-        - id: stream-service
-          uri: lb://stream-service
-          predicates:
-            - Path=/api/chat/**
-          metadata:
-            response-timeout: -1
-            connect-timeout: 5000
-        - id: biz-service
-          uri: lb://biz-service
-          predicates:
-            - Path=/api/sessions/**​, /api/messages/​**
-      httpclient:
-        response-timeout: 60s
-        connect-timeout: 10000
-# /internal/** 屏蔽规则及限流规则均由 RouteConfig.java 代码方式定义
-# SSE 路由关闭网关响应超时，实际回收由 stream-service 的 heartbeat/max-duration 控制
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**,/api/roles/**,/api/permissions/**,/api/resources/**,/oauth2/**
+            - id: stream-service
+              uri: lb://stream-service
+              predicates:
+                - Path=/api/chat/**
+              metadata:
+                response-timeout: -1
+                connect-timeout: 5000
+            - id: biz-service
+              uri: lb://biz-service
+              predicates:
+                - Path=/api/sessions/**,/api/messages/**
+          httpclient:
+            response-timeout: 60s
+            connect-timeout: 10000
+gateway:
+  security:
+    introspect-uri: http://localhost:18081/api/auth/introspect
+    authorize-uri: http://localhost:18081/api/auth/authorize
+    rate-limit-per-minute: 120
+    whitelist-prefixes:
+      - /api/auth/
+      - /oauth2/
+      - /actuator/health
 ```
 
 ### 10.6 application-prod.yml
 
 ```yaml
 server:
-  port: 18080
+  port: 8080
 spring:
   data:
     redis:
@@ -987,25 +1004,36 @@ spring:
         server-addr:
         namespace: prod
     gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/api/users/**​, /api/roles/​**, /api/permissions/**​, /oauth2/​**
-        - id: stream-service
-          uri: lb://stream-service
-          predicates:
-            - Path=/api/chat/**
-          metadata:
-            response-timeout: -1
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**,/api/roles/**,/api/permissions/**,/api/resources/**,/oauth2/**
+            - id: stream-service
+              uri: lb://stream-service
+              predicates:
+                - Path=/api/chat/**
+              metadata:
+                response-timeout: -1
+                connect-timeout: 5000
+            - id: biz-service
+              uri: lb://biz-service
+              predicates:
+                - Path=/api/sessions/**,/api/messages/**
+          httpclient:
+            response-timeout: 30s
             connect-timeout: 5000
-        - id: biz-service
-          uri: lb://biz-service
-          predicates:
-            - Path=/api/sessions/**​, /api/messages/​**
-      httpclient:
-        response-timeout: 30s
-        connect-timeout: 5000
+gateway:
+  security:
+    introspect-uri:
+    authorize-uri:
+    rate-limit-per-minute: 300
+    whitelist-prefixes:
+      - /api/auth/
+      - /oauth2/
+      - /actuator/health
 ```
 
 ---
@@ -1105,8 +1133,8 @@ public interface UserConverter {
 ### 11.4 GlobalExceptionHandler（Servlet）
 
 ```java
+@Slf4j
 @RestControllerAdvice
-@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
@@ -1129,6 +1157,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public R<?> handleException(Exception e) {
+        log.error("Unhandled user-service exception", e);
         return R.fail(ResultCode.SYSTEM_ERROR);
     }
 }
@@ -1141,10 +1170,36 @@ server:
   port: 18081
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/aicsp_user
+    type: com.alibaba.druid.pool.DruidDataSource
+    url: jdbc:postgresql://localhost:5432/aicsp_user?currentSchema=user_service
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      filters: stat,slf4j
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: admin
+        reset-enable: false
+        allow: 127.0.0.1
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: '*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*'
   data:
     redis:
       host: localhost
@@ -1154,28 +1209,56 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    schemas: user_service
+    default-schema: user_service
+    create-schemas: true
     baseline-on-migrate: true
   cloud:
     nacos:
       discovery:
         server-addr: localhost:8848
         namespace: dev
+        username: nacos
+        password: nacos
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+aicsp:
+  worker-id: 1
+  admin:
+    tenant-id: default
+    username: admin
+    password: 123456
+    gender: 0
+    real-name: Administrator
+    age: 18
+  jwt:
+    secret: aicsp-dev-secret-please-change-to-32bytes
+    ttl-seconds: 7200
+  resource:
+    project-root: D:/Projects/Java/ai-customer-service-platform
+    sync-interval-ms: 3600000
+    sync-initial-delay-ms: 60000
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin123
+    bucket: aicsp-user
+    public-url: http://localhost:9000
 ```
 
 ### 11.6 application-prod.yml
 
 ```yaml
 server:
-  port: 18081
+  port: 8081
 spring:
   datasource:
-    url:
-    username:
-    password: 123456
+    url: ${AICSP_USER_DB_URL:jdbc:postgresql://localhost:5432/aicsp_user?currentSchema=user_service}
+    username: ${AICSP_USER_DB_USERNAME:postgres}
+    password: ${AICSP_USER_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
@@ -1186,6 +1269,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    schemas: user_service
+    default-schema: user_service
+    create-schemas: true
     baseline-on-migrate: true
   cloud:
     nacos:
@@ -1196,6 +1282,22 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+aicsp:
+  worker-id: ${AICSP_WORKER_ID:1}
+  admin:
+    tenant-id: ${AICSP_ADMIN_TENANT_ID:default}
+    username: ${AICSP_ADMIN_USERNAME:admin}
+    password: ${AICSP_ADMIN_PASSWORD:123456}
+    gender: ${AICSP_ADMIN_GENDER:0}
+    real-name: ${AICSP_ADMIN_REAL_NAME:Administrator}
+    age: ${AICSP_ADMIN_AGE:18}
+  minio:
+    endpoint: ${AICSP_MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${AICSP_MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${AICSP_MINIO_SECRET_KEY:minioadmin123}
+    bucket: ${AICSP_MINIO_BUCKET:aicsp-user}
+    public-url: ${AICSP_MINIO_PUBLIC_URL:http://localhost:9000}
 ```
 
 ---
@@ -1655,7 +1757,8 @@ mybatis:
 客户端
   └─ 携带 Bearer JWT
        └─ gateway-service（AuthGlobalFilter）
-            ├─ 基于 user-service 发布的 JWK Set 本地验签 JWT
+            ├─ 调用 user-service /api/auth/introspect 判断 Token 是否 active
+            ├─ 调用 user-service /api/auth/authorize 判断 method + path 是否允许访问
             ├─ 清理外部传入的 X-User-* / X-Tenant-* / X-Trace-Id 同名请求头
             ├─ 验证通过：重写注入 X-User-Id / X-Tenant-Id / X-User-Roles / X-Trace-Id
             └─ 验证失败：返回 401
@@ -1665,8 +1768,8 @@ mybatis:
 
 | 服务 | 策略 |
 |------|------|
-| `gateway-service` | 拦截所有外部请求，使用 Resource Server 能力基于 JWK Set 本地验签 JWT；白名单放行 `/oauth2/token`、`/oauth2/jwks`、`/actuator/health`；对外部入站先清洗身份头，再由 `RouteConfig` 屏蔽 `/internal/**` |
-| `user-service` | Spring Authorization Server 负责 Token 签发、JWK 发布与 introspection 能力；`/oauth2/**` 公开，其余管理接口仅允许受信内部调用 |
+| `gateway-service` | `SecurityConfig` 放行 WebFlux 安全链，实际鉴权由 `AuthGlobalFilter` 完成；白名单前缀为 `/api/auth/`、`/oauth2/`、`/actuator/health`；非白名单请求调用 user-service 做 introspect 与 authorize；`/internal/**` 直接返回 404 |
+| `user-service` | 负责注册、登录、JWT 签发、introspection 与 RBAC authorize；`/api/auth/**`、`/oauth2/**`、`/actuator/health` 公开，其余管理接口当前由业务层/RBAC 控制 |
 | `stream-service` | 不直接面向公网暴露业务入口；仅信任来自 gateway-service 的身份头；`/internal/**` 在应用层校验 `X-Internal-Token` 请求头 |
 | `biz-service` | 不直接面向公网暴露；仅信任来自 gateway-service 的身份头，并通过网络策略限制来源 |
 
@@ -1675,7 +1778,7 @@ mybatis:
 - **网络层**：K8s NetworkPolicy 或安全组规则限制访问来源。`stream-service` 18082 仅允许 `gateway-service` 与 Python 引擎访问；`biz-service` 18083 仅允许 `gateway-service` 访问。
 - **应用层**：`SecurityConfig` 对 `/internal/**` 校验 `X-Internal-Token`，Token 值通过 `internal.token` 配置项注入，生产环境由 Nacos 或 K8s Secret 提供。
 - **头来源治理**：网关统一清理外部传入的身份相关请求头，仅允许网关重写注入后的头向下游传播。
-- **网关层**：`RouteConfig` 对外部入站的 `/internal/**` 路径直接返回 404，多层防护互为兜底。
+- **网关层**：`AuthGlobalFilter` 对外部入站的 `/internal/**` 路径直接返回 404，并基于 Redis 对白名单与鉴权后请求做按分钟限流。
 
 ---
 
@@ -1695,15 +1798,19 @@ mybatis:
 ### 16.2 logback-spring.xml 统一模板
 
 ```xml
-<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n</pattern>
+<property name="CONSOLE_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %highlight(%-5level) %clr([%X{traceId:-}]){cyan} %clr(%logger{36}){blue} %clr(-){faint} %msg%n%wEx"/>
+<property name="FILE_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{64} - %msg%n%wEx"/>
 ```
 
 ### 16.3 日志级别策略
 
-| 环境 | 根级别 | 业务包级别 | 说明 |
-|------|--------|-----------|------|
-| `dev` | `DEBUG` | `DEBUG` | 输出全量日志，含 MyBatis SQL |
-| `prod` | `INFO` | `INFO` | 仅输出业务关键日志，ERROR 单独输出到文件 |
+| 项 | 当前配置 | 说明 |
+|------|--------|------|
+| 根级别 | `INFO` | 各服务 `logback-spring.xml` 当前统一使用 `root level="INFO"` |
+| 控制台 | `CONSOLE` | 输出到服务启动终端，包含 traceId 与异常堆栈 |
+| 应用日志 | `${logging.file.path}/${spring.application.name}/app.log` | 默认 `logging.file.path=logs`，滚动文件保存 INFO 及以上日志 |
+| 错误日志 | `${logging.file.path}/${spring.application.name}/error.log` | `ThresholdFilter` 仅保存 ERROR 及以上日志 |
+| 兜底异常 | `log.error(...)` | `gateway-service` 与 `user-service` 的 `GlobalExceptionHandler` 对未处理异常打印堆栈；网关 `AuthGlobalFilter` 对过滤器链路异常额外打印 method/path/principal |
 
 ---
 
@@ -1729,7 +1836,6 @@ mybatis:
 | PostgreSQL 性能 | 高频关联、排序、分页优先使用数值型 `BIGINT` 主键或索引列，避免随机 UUID 直接作为主键导致索引膨胀和页分裂 |
 | 业务唯一键 | `user_id`、`session_id`、`message_id` 保留为对外业务 ID 或幂等键，不作为物理主键 |
 | 审计字段 | 每张表必须包含 `created_by`、`created_at`、`updated_by`、`updated_at` |
-| 软删除 | 每张表必须包含 `deleted`、`deleted_at`，业务删除只能更新软删除字段，不允许物理删除 |
 | 唯一约束 | 与业务唯一性相关的索引需带 `WHERE deleted = FALSE`，避免软删除数据影响新数据创建 |
 
 审计字段语义：
@@ -1741,7 +1847,6 @@ mybatis:
 | `updated_by` | `BIGINT` | 最近更新人的唯一 ID，系统初始化数据可使用 `0` |
 | `updated_at` | `TIMESTAMPTZ` | 最近更新时间 |
 | `deleted` | `BOOLEAN` | 是否已软删除 |
-| `deleted_at` | `TIMESTAMPTZ` | 软删除时间，未删除时为空 |
 
 ### 17.3 user-service 核心表（Flyway V1__init_schema.sql）
 
@@ -1758,7 +1863,6 @@ CREATE TABLE cs_user (
     updated_by  BIGINT       NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at  TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_user_user_id ON cs_user (user_id) WHERE deleted = FALSE;
@@ -1774,7 +1878,6 @@ CREATE TABLE cs_role (
     updated_by  BIGINT       NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at  TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_role_role_code ON cs_role (role_code) WHERE deleted = FALSE;
@@ -1788,7 +1891,6 @@ CREATE TABLE cs_permission (
     updated_by      BIGINT       NOT NULL DEFAULT 0,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted         BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at      TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_permission_code ON cs_permission (permission_code) WHERE deleted = FALSE;
@@ -1802,7 +1904,6 @@ CREATE TABLE cs_user_role (
     updated_by  BIGINT       NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at  TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_user_role ON cs_user_role (user_id, role_id) WHERE deleted = FALSE;
@@ -1816,7 +1917,6 @@ CREATE TABLE cs_role_permission (
     updated_by    BIGINT       NOT NULL DEFAULT 0,
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted       BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at    TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_role_permission ON cs_role_permission (role_id, permission_id) WHERE deleted = FALSE;
@@ -1837,7 +1937,6 @@ CREATE TABLE cs_session (
     updated_by  BIGINT       NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at  TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_session_session_id ON cs_session (session_id) WHERE deleted = FALSE;
@@ -1858,7 +1957,6 @@ CREATE TABLE cs_message (
     updated_by  BIGINT       NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted     BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at  TIMESTAMPTZ  DEFAULT NULL
 );
 
 CREATE UNIQUE INDEX uk_cs_message_message_id ON cs_message (message_id) WHERE deleted = FALSE;
@@ -1900,6 +1998,17 @@ mvn clean package -P dev -pl biz-service -am
 `application-prod.yml` 中所有留空字段（数据库地址、Redis 地址、RocketMQ NameServer、
 Nacos 地址、`internal.token` 等）均应通过 Nacos 配置中心或 K8s ConfigMap/Secret
 在生产环境注入，**禁止将生产环境凭证提交至代码仓库**。
+
+### 18.4 前端本地代理配置
+
+前端开发环境通过 Vite 代理访问 Java 网关。当前代码中的默认配置如下：
+
+```env
+VITE_API_BASE_URL=/api
+VITE_API_PROXY_TARGET=http://localhost:18080
+```
+
+`VITE_API_PROXY_TARGET` 必须指向 `gateway-service` 的 dev 端口 `18080`。如果误配为 `8080`，请求可能打到本机 Docker/WSL 等其他进程，表现为登录/注册接口 500 或连接异常，且 `user-service` 终端不会打印接口日志。
 
 ---
 
@@ -1944,11 +2053,12 @@ Nacos 地址、`internal.token` 等）均应通过 Nacos 配置中心或 K8s Con
 |------|--------|---------|---------|
 | `user-service` | Servlet | `R<?>` | 同步捕获 |
 | `biz-service` | Servlet | `R<?>` | 同步捕获 |
-| `gateway-service` | WebFlux | `Mono<R<?>>` | 响应式捕获 |
+| `gateway-service` | WebFlux | `Mono<R<?>>` | 响应式捕获；过滤器链路异常需在过滤器中额外记录 |
 | `stream-service` | WebFlux | `Mono<R<?>>` / `Flux<ServerSentEvent<?>>` | SSE 流内异常须额外用 `.onErrorResume()` 处理 |
 
 > Servlet 栈统一捕获 `BizException`、`JsonException`、`MethodArgumentNotValidException`、`Exception`；
 > WebFlux 栈统一捕获 `BizException`、`JsonException`、`WebExchangeBindException`、`Exception`；
+> `Exception` 兜底处理必须用 `log.error(...)` 打印异常堆栈，再返回统一 `SYSTEM_ERROR`；
 > SSE 流内异常通过 `.onErrorResume()` 处理。业务描述统一通过 `getBizMessage()` 获取。
 
 ### A.5 幂等实现规范
@@ -1958,3 +2068,47 @@ Nacos 地址、`internal.token` 等）均应通过 Nacos 配置中心或 K8s Con
 | 会话创建 | `session_id` | `INSERT INTO cs_session ... ON CONFLICT DO NOTHING` |
 | 消息持久化 | `message_id` | `INSERT INTO cs_message ... ON CONFLICT DO NOTHING`，依赖 `uk_message_id` 唯一索引 |
 | Function Call 防腐 | 无状态 | 每次请求独立查询外部系统，天然幂等 |
+
+---
+
+## 20. 近期设计约束更新（2026-04-25）
+
+### 20.1 数据库 Schema 约束
+
+- `user-service` 使用独立数据库 `aicsp_user`，业务对象统一创建在 PostgreSQL schema `user_service`，不得创建在 `public` schema。
+- `biz-service` 使用独立数据库 `aicsp_biz`，业务对象统一创建在 PostgreSQL schema `biz_service`，不得创建在 `public` schema。
+- Flyway 配置必须显式声明 `spring.flyway.schemas`、`spring.flyway.default-schema`、`spring.flyway.create-schemas=true`。
+- JDBC URL 需携带 `currentSchema`，确保 MyBatis 无 schema 前缀 SQL 落到对应业务 schema。
+
+### 20.2 软删除与审计字段
+
+- 删除本质是更新操作，删除时只更新 `deleted=true`、`updated_by`、`updated_at`。
+- 所有新增表必须包含 `created_by`、`created_at`、`updated_by`、`updated_at`、`deleted`。
+
+### 20.3 分布式 ID 规则
+
+- 物理主键统一使用应用侧分布式 ID，当前实现为 Snowflake 风格：时间戳 + worker-id + sequence。
+- 集群部署时必须为不同实例配置不同 `aicsp.worker-id` 或 `AICSP_WORKER_ID`，避免 worker-id 冲突。
+- dev 默认值：`user-service=1`，`biz-service=2`。
+
+### 20.4 用户资料与头像
+
+`cs_user` 除账号密码字段外，需要保存以下资料字段：
+
+| 字段 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|
+| `avatar_path` | `VARCHAR(512)` | 否 | MinIO 头像对象路径或公开访问 URL |
+| `gender` | `SMALLINT` | 是 | 性别枚举值，由业务约定具体含义 |
+| `real_name` | `VARCHAR(64)` | 是 | 姓名 |
+| `age` | `SMALLINT` | 是 | 年龄 |
+| `email` | `VARCHAR(128)` | 否 | 邮箱 |
+| `phone` | `VARCHAR(32)` | 否 | 电话 |
+| `address` | `VARCHAR(256)` | 否 | 住址 |
+
+注册接口保留 JSON 版本 `/api/auth/register`，并新增支持头像上传的 `multipart/form-data` 接口 `/api/auth/register-with-avatar`。头像文件字段名为 `avatar`，其它注册字段按表单字段提交。
+
+### 20.5 MinIO 约束
+
+- 用户头像文件使用 MinIO 存储，数据库只保存 `avatar_path`。
+- dev 默认 Bucket：`aicsp-user`。
+- 生产环境通过 `AICSP_MINIO_ENDPOINT`、`AICSP_MINIO_ACCESS_KEY`、`AICSP_MINIO_SECRET_KEY`、`AICSP_MINIO_BUCKET`、`AICSP_MINIO_PUBLIC_URL` 注入。

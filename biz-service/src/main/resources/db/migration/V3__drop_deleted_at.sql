@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS cs_session DROP COLUMN IF EXISTS deleted_at;
+ALTER TABLE IF EXISTS cs_message DROP COLUMN IF EXISTS deleted_at;

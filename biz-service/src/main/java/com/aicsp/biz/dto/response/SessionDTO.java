@@ -1,6 +1,6 @@
 package com.aicsp.biz.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,5 +15,5 @@ public class SessionDTO {
     private String sessionId;
     private String title;
     private Integer status;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

@@ -6,7 +6,7 @@ spring:
 logging:
   config: classpath:logback-spring.xml
   file:
-    path: logs
+    path: user-service/logs
 management:
   endpoints:
     web:
