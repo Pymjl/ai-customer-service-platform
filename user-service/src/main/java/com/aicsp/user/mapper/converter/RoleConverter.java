@@ -13,7 +13,11 @@ public interface RoleConverter {
     RoleDTO toDTO(Role role);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "createdBy", expression = "java(0L)")
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedBy", expression = "java(0L)")
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "deleted", expression = "java(false)")
     Role toEntity(RoleCreateRequest request);
 
     List<RoleDTO> toDTOList(List<Role> roles);

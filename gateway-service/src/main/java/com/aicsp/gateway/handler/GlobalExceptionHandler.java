@@ -4,11 +4,13 @@ import com.aicsp.common.exception.BizException;
 import com.aicsp.common.exception.JsonException;
 import com.aicsp.common.result.R;
 import com.aicsp.common.result.ResultCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -29,6 +31,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public Mono<R<?>> handleException(Exception e) {
+        log.error("Unhandled gateway exception", e);
         return Mono.just(R.fail(ResultCode.SYSTEM_ERROR));
     }
 }

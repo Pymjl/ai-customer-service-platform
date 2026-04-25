@@ -1,5 +1,32 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.user.mapper.UserMapper">
+    <sql id="BaseColumns">id,user_id,tenant_id,username,password,avatar_path,gender,real_name,age,email,phone,address,status,created_by,created_at,updated_by,updated_at,deleted</sql>
+    <select id="selectAll" resultType="com.aicsp.user.entity.User">
+        SELECT <include refid="BaseColumns" /> FROM cs_user WHERE deleted = FALSE ORDER BY created_at DESC
+    </select>
+    <select id="selectByUsername" resultType="com.aicsp.user.entity.User">
+        SELECT <include refid="BaseColumns" /> FROM cs_user WHERE tenant_id = #{tenantId} AND lower(username) = lower(#{username}) AND deleted = FALSE LIMIT 1
+    </select>
+    <select id="selectByUserId" resultType="com.aicsp.user.entity.User">
+        SELECT <include refid="BaseColumns" /> FROM cs_user WHERE user_id = #{userId} AND deleted = FALSE LIMIT 1
+    </select>
+    <insert id="insert" parameterType="com.aicsp.user.entity.User">
+        INSERT INTO cs_user(id,user_id,tenant_id,username,password,avatar_path,gender,real_name,age,email,phone,address,status,created_by,updated_by)
+        VALUES(#{id},#{userId},#{tenantId},#{username},#{password},#{avatarPath},#{gender},#{realName},#{age},#{email},#{phone},#{address},#{status},0,0)
+    </insert>
+    <update id="updatePassword">
+        UPDATE cs_user SET password = #{password}, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId} AND deleted = FALSE
+    </update>
+    <update id="updateProfile" parameterType="com.aicsp.user.entity.User">
+        UPDATE cs_user
+        SET gender = #{gender}, real_name = #{realName}, age = #{age}, email = #{email}, phone = #{phone}, address = #{address}, status = #{status}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId} AND deleted = FALSE
+    </update>
+    <update id="updateAvatar">
+        UPDATE cs_user SET avatar_path = #{avatarPath}, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId} AND deleted = FALSE
+    </update>
+    <update id="updateStatus">
+        UPDATE cs_user SET status = #{status}, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId} AND deleted = FALSE
+    </update>
 </mapper>

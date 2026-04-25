@@ -1,34 +1,48 @@
 server:
-  port: 8080
+  port: 18080
 spring:
   data:
     redis:
-      host:
-      port:
-      password:
+      host: localhost
+      port: 6379
+      password: 123456
       database: 0
   cloud:
     nacos:
       discovery:
-        server-addr:
-        namespace: prod
+        server-addr: localhost:8848
+        namespace: dev
+        username: nacos
+        password: nacos
     gateway:
-      routes:
-        - id: user-service
-          uri: lb://user-service
-          predicates:
-            - Path=/api/users/**,/api/roles/**,/api/permissions/**,/oauth2/**
-        - id: stream-service
-          uri: lb://stream-service
-          predicates:
-            - Path=/api/chat/**
-          metadata:
-            response-timeout: -1
-            connect-timeout: 5000
-        - id: biz-service
-          uri: lb://biz-service
-          predicates:
-            - Path=/api/sessions/**,/api/messages/**
-      httpclient:
-        response-timeout: 30s
-        connect-timeout: 5000
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**,/api/roles/**,/api/permissions/**,/api/resources/**,/oauth2/**
+            - id: stream-service
+              uri: lb://stream-service
+              predicates:
+                - Path=/api/chat/**
+              metadata:
+                response-timeout: -1
+                connect-timeout: 5000
+            - id: biz-service
+              uri: lb://biz-service
+              predicates:
+                - Path=/api/sessions/**,/api/messages/**
+          httpclient:
+            response-timeout: 60s
+            connect-timeout: 10000
+gateway:
+  security:
+    introspect-uri: http://localhost:18081/api/auth/introspect
+    authorize-uri: http://localhost:18081/api/auth/authorize
+    internal-token: 68d5ee453de54a35adfdb7f84f1ff8ef8cd10283c9e94979bdce1a8f927c7f79
+    rate-limit-per-minute: 120
+    whitelist-prefixes:
+      - /api/auth/
+      - /oauth2/
+      - /actuator/health

@@ -14,7 +14,7 @@ public final class DistributedIdUtils {
     private static final long SEQUENCE_BITS = 12L;
     private static final long MAX_WORKER_ID = (1L << WORKER_ID_BITS) - 1;
     private static final long SEQUENCE_MASK = (1L << SEQUENCE_BITS) - 1;
-    private static final long WORKER_ID = resolveWorkerId();
+    private static volatile long workerId = resolveWorkerId();
     private static final AtomicLong LAST_TIMESTAMP = new AtomicLong(-1L);
     private static final AtomicLong SEQUENCE = new AtomicLong(0L);
 
@@ -47,9 +47,17 @@ public final class DistributedIdUtils {
         }
     }
 
+    public static void setWorkerId(long configuredWorkerId) {
+        workerId = configuredWorkerId & MAX_WORKER_ID;
+    }
+
+    public static long getWorkerId() {
+        return workerId;
+    }
+
     private static long buildId(long timestamp, long sequence) {
         return ((timestamp - EPOCH) << (WORKER_ID_BITS + SEQUENCE_BITS))
-                | (WORKER_ID << SEQUENCE_BITS)
+                | (workerId << SEQUENCE_BITS)
                 | sequence;
     }
 

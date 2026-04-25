@@ -20,7 +20,6 @@ public interface UserConverter {
     @Mapping(target = "updatedBy", expression = "java(0L)")
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "deleted", expression = "java(false)")
-    @Mapping(target = "deletedAt", ignore = true)
     User toEntity(UserCreateRequest request);
 
     List<UserDTO> toDTOList(List<User> users);

@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.user.mapper.RoleMapper">
+    <sql id="BaseColumns">id,role_code,role_name,created_by,created_at,updated_by,updated_at,deleted</sql>
+    <select id="selectAll" resultType="com.aicsp.user.entity.Role">
+        SELECT <include refid="BaseColumns" /> FROM cs_role WHERE deleted = FALSE ORDER BY id
+    </select>
+    <select id="selectById" resultType="com.aicsp.user.entity.Role">
+        SELECT <include refid="BaseColumns" /> FROM cs_role WHERE id = #{id} AND deleted = FALSE
+    </select>
+    <select id="selectByCode" resultType="com.aicsp.user.entity.Role">
+        SELECT <include refid="BaseColumns" /> FROM cs_role WHERE role_code = #{roleCode} AND deleted = FALSE
+    </select>
+    <select id="selectByUserId" resultType="com.aicsp.user.entity.Role">
+        SELECT r.id,r.role_code,r.role_name,r.created_by,r.created_at,r.updated_by,r.updated_at,r.deleted
+        FROM cs_role r JOIN cs_user_role ur ON r.id = ur.role_id AND ur.deleted = FALSE
+        WHERE ur.user_id = #{userId} AND r.deleted = FALSE ORDER BY r.id
+    </select>
+    <insert id="insert" parameterType="com.aicsp.user.entity.Role">
+        INSERT INTO cs_role(id,role_code,role_name,created_by,updated_by) VALUES(#{id},#{roleCode},#{roleName},0,0)
+    </insert>
 </mapper>

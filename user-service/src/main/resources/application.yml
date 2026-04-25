@@ -5,6 +5,8 @@ spring:
     name: user-service
 logging:
   config: classpath:logback-spring.xml
+  file:
+    path: logs
 management:
   endpoints:
     web:

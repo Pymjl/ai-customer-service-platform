@@ -1,9 +1,9 @@
-server:
+﻿server:
   port: 18081
 spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
-    url: jdbc:postgresql://localhost:5432/aicsp_user
+    url: jdbc:postgresql://localhost:5432/aicsp_user?currentSchema=user_service
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
@@ -41,6 +41,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    schemas: user_service
+    default-schema: user_service
+    create-schemas: true
     baseline-on-migrate: true
   cloud:
     nacos:
@@ -53,3 +56,28 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
+
+aicsp:
+  worker-id: 1
+  admin:
+    tenant-id: default
+    username: admin
+    password: 123456
+    gender: 0
+    real-name: Administrator
+    age: 18
+  jwt:
+    secret: 4f4bbb6ee20f3e4b0f12aade1a6cbf81c8554bb2c6ab5206b7dbc03942cf5796
+    ttl-seconds: 7200
+  security:
+    internal-token: 68d5ee453de54a35adfdb7f84f1ff8ef8cd10283c9e94979bdce1a8f927c7f79
+  resource:
+    project-root: D:/Projects/Java/ai-customer-service-platform
+    sync-interval-ms: 3600000
+    sync-initial-delay-ms: 60000
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin123
+    bucket: aicsp-user
+    public-url: http://localhost:9000

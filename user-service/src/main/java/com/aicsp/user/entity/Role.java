@@ -1,6 +1,6 @@
 package com.aicsp.user.entity;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,9 +14,8 @@ public class Role {
     private String roleCode;
     private String roleName;
     private Long createdBy;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     private Long updatedBy;
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
     private Boolean deleted;
-    private LocalDateTime deletedAt;
 }

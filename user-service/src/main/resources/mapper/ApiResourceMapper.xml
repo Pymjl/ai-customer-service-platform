@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aicsp.user.mapper.ApiResourceMapper">
+    <sql id="BaseColumns">id,resource_code,service_name,controller_path,controller_name,http_method,path,method_name,description,enabled,created_at,updated_at,deleted</sql>
+    <select id="selectAll" resultType="com.aicsp.user.entity.ApiResource">
+        SELECT <include refid="BaseColumns" /> FROM cs_api_resource WHERE deleted = FALSE ORDER BY service_name, controller_path, path, http_method
+    </select>
+    <select id="selectByCode" resultType="com.aicsp.user.entity.ApiResource">
+        SELECT <include refid="BaseColumns" /> FROM cs_api_resource WHERE resource_code = #{resourceCode} AND deleted = FALSE LIMIT 1
+    </select>
+    <select id="selectByRoleIds" resultType="com.aicsp.user.entity.ApiResource">
+        SELECT DISTINCT ar.id,ar.resource_code,ar.service_name,ar.controller_path,ar.controller_name,ar.http_method,ar.path,ar.method_name,ar.description,ar.enabled,ar.created_at,ar.updated_at,ar.deleted
+        FROM cs_api_resource ar JOIN cs_role_resource rr ON ar.id = rr.resource_id AND rr.deleted = FALSE
+        WHERE ar.deleted = FALSE AND rr.role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId}</foreach>
+    </select>
+    <insert id="insert" parameterType="com.aicsp.user.entity.ApiResource">
+        INSERT INTO cs_api_resource(id,resource_code,service_name,controller_path,controller_name,http_method,path,method_name,description,enabled)
+        VALUES(#{id},#{resourceCode},#{serviceName},#{controllerPath},#{controllerName},#{httpMethod},#{path},#{methodName},#{description},#{enabled})
+    </insert>
+    <update id="update" parameterType="com.aicsp.user.entity.ApiResource">
+        UPDATE cs_api_resource SET service_name=#{serviceName},controller_path=#{controllerPath},controller_name=#{controllerName},http_method=#{httpMethod},path=#{path},method_name=#{methodName},description=#{description},enabled=#{enabled},updated_at=CURRENT_TIMESTAMP
+        WHERE resource_code=#{resourceCode} AND deleted = FALSE
+    </update>
+    <update id="deleteRoleResources">
+        UPDATE cs_role_resource SET deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE role_id = #{roleId} AND deleted = FALSE
+    </update>
+    <insert id="insertRoleResource">
+        INSERT INTO cs_role_resource(id,role_id,resource_id,created_by,updated_by) VALUES(#{id},#{roleId},#{resourceId},0,0)
+    </insert>
+    <select id="selectResourceIdsByRoleId" resultType="long">
+        SELECT resource_id FROM cs_role_resource WHERE role_id = #{roleId} AND deleted = FALSE ORDER BY resource_id
+    </select>
+</mapper>

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.user.mapper.RolePermissionMapper">
+    <update id="deleteByRoleId">
+        UPDATE cs_role_permission SET deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE role_id = #{roleId} AND deleted = FALSE
+    </update>
+    <insert id="insert">
+        INSERT INTO cs_role_permission(id,role_id,permission_id,created_by,updated_by) VALUES(#{id},#{roleId},#{permissionId},0,0)
+    </insert>
 </mapper>
