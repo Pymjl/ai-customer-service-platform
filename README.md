@@ -49,58 +49,53 @@ ai-customer-service-platform/
 
 ## 架构图
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-skinparam shadowing false
+```mermaid
+flowchart LR
+    Client["Browser / Client"]
+    FE["Frontend<br/>Vue 3"]
+    Gateway["gateway-service<br/>:18080"]
+    User["user-service<br/>:18081"]
+    Stream["stream-service<br/>:18082"]
+    Biz["biz-service<br/>:18083"]
+    Common["common"]
 
-actor "Browser / Client" as Client
+    UserDB[("PostgreSQL<br/>aicsp_user")]
+    BizDB[("PostgreSQL<br/>aicsp_biz")]
+    Redis[("Redis")]
+    MQ[["RocketMQ"]]
+    Nacos[("Nacos")]
+    Minio[("MinIO")]
+    Python["Python AI Engine<br/>可选/预留"]
 
-node "Frontend\nVue 3" as FE
-node "gateway-service\n:18080" as Gateway
-node "user-service\n:18081" as User
-node "stream-service\n:18082" as Stream
-node "biz-service\n:18083" as Biz
-node "common" as Common
+    Client --> FE
+    FE -->|"HTTP / API"| Gateway
 
-database "PostgreSQL\naicsp_user" as UserDB
-database "PostgreSQL\naicsp_biz" as BizDB
-database "Redis" as Redis
-queue "RocketMQ" as MQ
-cloud "Nacos" as Nacos
-cloud "MinIO" as Minio
-cloud "Python AI Engine\n可选/预留" as Python
+    Gateway -->|"/api/auth/**<br/>/api/users/**<br/>/api/roles/**<br/>/api/resources/**"| User
+    Gateway -->|"/api/chat/**"| Stream
+    Gateway -->|"/api/sessions/**<br/>/api/messages/**"| Biz
 
-Client --> FE
-FE --> Gateway : HTTP / API
+    Gateway -->|"rate limit"| Redis
+    Gateway -->|"introspect / authorize"| User
+    Gateway --> Nacos
 
-Gateway --> User : /api/auth/**\n/api/users/**\n/api/roles/**\n/api/resources/**
-Gateway --> Stream : /api/chat/**
-Gateway --> Biz : /api/sessions/**\n/api/messages/**
+    User --> UserDB
+    User -->|"refresh token"| Redis
+    User -->|"avatar"| Minio
+    User --> Nacos
 
-Gateway --> Redis : rate limit
-Gateway --> User : introspect / authorize
-Gateway --> Nacos
+    Stream -->|"message completed event"| MQ
+    Stream -->|"reserved WebClient"| Python
+    Stream --> Nacos
 
-User --> UserDB
-User --> Redis : refresh token
-User --> Minio : avatar
-User --> Nacos
+    Biz --> BizDB
+    Biz --> Redis
+    Biz -->|"consume event"| MQ
+    Biz --> Nacos
 
-Stream --> MQ : message completed event
-Stream --> Python : reserved WebClient
-Stream --> Nacos
-
-Biz --> BizDB
-Biz --> Redis
-Biz --> MQ : consume event
-Biz --> Nacos
-
-Common ..> Gateway
-Common ..> User
-Common ..> Stream
-Common ..> Biz
-@enduml
+    Common -.-> Gateway
+    Common -.-> User
+    Common -.-> Stream
+    Common -.-> Biz
 ```
 
 ## 认证与授权数据流
@@ -112,60 +107,58 @@ Common ..> Biz
 - 网关鉴权通过后会向下游写入 `X-User-Id`、`X-Tenant-Id`、`X-User-Roles`、`X-Internal-Token`。
 - `user-service` 的非公开接口只接受带正确 `X-Internal-Token` 的网关内部请求，避免绕过网关访问。
 
-```plantuml
-@startuml
-actor Client
-participant "gateway-service" as Gateway
-participant "user-service" as User
-database Redis
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Gateway as gateway-service
+    participant User as user-service
+    participant Redis
 
-Client -> User : POST /api/auth/login\nusername/password/captchaToken
-User -> User : verify credentials
-User -> User : create JWT accessToken
-User -> Redis : SET refreshTokenHash TTL=3d
-User --> Client : accessToken + refreshToken + expiresIn + profile
+    Client->>User: POST /api/auth/login<br/>username/password/captchaToken
+    User->>User: verify credentials
+    User->>User: create JWT accessToken
+    User->>Redis: SET refreshTokenHash TTL=3d
+    User-->>Client: accessToken + refreshToken + expiresIn + profile
 
-Client -> Gateway : API request\nAuthorization: Bearer accessToken
-Gateway -> User : POST /api/auth/introspect
-User -> User : verify JWT signature and exp
-User --> Gateway : active + user profile
-Gateway -> User : POST /api/auth/authorize
-User --> Gateway : allowed true/false
-Gateway -> Gateway : inject identity headers
-Gateway --> Client : proxied API response
+    Client->>Gateway: API request<br/>Authorization: Bearer accessToken
+    Gateway->>User: POST /api/auth/introspect
+    User->>User: verify JWT signature and exp
+    User-->>Gateway: active + user profile
+    Gateway->>User: POST /api/auth/authorize
+    User-->>Gateway: allowed true/false
+    Gateway->>Gateway: inject identity headers
+    Gateway-->>Client: proxied API response
 
-Client -> User : POST /api/auth/refresh\nrefreshToken
-User -> Redis : GETDEL old refresh token
-User -> User : compare hash
-User -> Redis : SET new refresh token hash TTL=3d
-User --> Client : new accessToken + new refreshToken
+    Client->>User: POST /api/auth/refresh<br/>refreshToken
+    User->>Redis: GETDEL old refresh token
+    User->>User: compare hash
+    User->>Redis: SET new refresh token hash TTL=3d
+    User-->>Client: new accessToken + new refreshToken
 
-Client -> User : POST /api/auth/logout\nrefreshToken
-User -> Redis : delete refresh token
-User --> Client : success
-@enduml
+    Client->>User: POST /api/auth/logout<br/>refreshToken
+    User->>Redis: delete refresh token
+    User-->>Client: success
 ```
 
 ## 对话数据流
 
-```plantuml
-@startuml
-actor Client
-participant "gateway-service" as Gateway
-participant "stream-service" as Stream
-queue RocketMQ
-participant "biz-service" as Biz
-database "PostgreSQL aicsp_biz" as BizDB
+```mermaid
+sequenceDiagram
+    actor Client
+    participant Gateway as gateway-service
+    participant Stream as stream-service
+    participant RocketMQ
+    participant Biz as biz-service
+    participant BizDB as PostgreSQL aicsp_biz
 
-Client -> Gateway : POST /api/chat/stream\nBearer accessToken
-Gateway -> Gateway : auth + rate limit
-Gateway -> Stream : forward request + identity headers
-Stream -> Stream : create SSE events
-Stream --> Client : text/event-stream
-Stream -> RocketMQ : MessageCompletedEvent
-RocketMQ -> Biz : consume event
-Biz -> BizDB : persist session/message
-@enduml
+    Client->>Gateway: POST /api/chat/stream<br/>Bearer accessToken
+    Gateway->>Gateway: auth + rate limit
+    Gateway->>Stream: forward request + identity headers
+    Stream->>Stream: create SSE events
+    Stream-->>Client: text/event-stream
+    Stream->>RocketMQ: MessageCompletedEvent
+    RocketMQ->>Biz: consume event
+    Biz->>BizDB: persist session/message
 ```
 
 ## 本地环境准备
