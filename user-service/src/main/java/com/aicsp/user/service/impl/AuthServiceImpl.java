@@ -137,6 +137,11 @@ public class AuthServiceImpl implements AuthService {
         IntrospectionResponse response = new IntrospectionResponse();
         try {
             JwtTokenService.TokenClaims claims = parseHeader(authorization);
+            User user = userMapper.selectByUserId(claims.userId());
+            if (!isActiveUser(user)) {
+                response.setActive(false);
+                return response;
+            }
             response.setActive(true);
             response.setUserId(claims.userId());
             response.setTenantId(claims.tenantId());
@@ -151,6 +156,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public boolean authorize(String authorization, String httpMethod, String path) {
         JwtTokenService.TokenClaims claims = parseHeader(authorization);
+        User user = userMapper.selectByUserId(claims.userId());
+        if (!isActiveUser(user)) {
+            return false;
+        }
         List<Role> activeRoles = activeRoles(claims.userId());
         List<String> roles = activeRoles.stream().map(Role::getRoleCode).toList();
         String normalizedPath = path == null ? "" : path.split("\\?")[0];
@@ -184,6 +193,10 @@ public class AuthServiceImpl implements AuthService {
 
     private List<Role> activeRoles(String userId) {
         return roleMapper.selectByUserId(userId);
+    }
+
+    private boolean isActiveUser(User user) {
+        return user != null && user.getStatus() != null && user.getStatus() == 1;
     }
 
     private String normalizeUsername(String username) {

@@ -3,6 +3,7 @@ package com.aicsp.user.service.impl;
 import com.aicsp.user.config.JwtProperties;
 import com.aicsp.user.entity.ApiResource;
 import com.aicsp.user.entity.Role;
+import com.aicsp.user.entity.User;
 import com.aicsp.user.mapper.ApiResourceMapper;
 import com.aicsp.user.mapper.RoleMapper;
 import com.aicsp.user.mapper.UserMapper;
@@ -55,9 +56,45 @@ class AuthServiceImplTest {
         Assertions.assertTrue(service.authorize(token, "GET", "/api/c"));
     }
 
+    @Test
+    void shouldRejectAuthorizationWhenUserDisabled() {
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties());
+        Role role = role(1L, "ROLE_1");
+        ApiResource permission = resource(101L, "GET", "/api/a");
+        UserMapper userMapper = Mockito.mock(UserMapper.class);
+        RoleMapper roleMapper = Mockito.mock(RoleMapper.class);
+        ApiResourceMapper resourceMapper = Mockito.mock(ApiResourceMapper.class);
+        Mockito.when(userMapper.selectByUserId("U1")).thenReturn(user("U1", 0));
+        Mockito.when(roleMapper.selectByUserId("U1")).thenReturn(List.of(role));
+        Mockito.when(resourceMapper.selectAll()).thenReturn(List.of(permission));
+        Mockito.when(resourceMapper.selectByRoleIds(List.of(1L))).thenReturn(List.of(permission));
+        AuthServiceImpl service = service(userMapper, roleMapper, resourceMapper, jwtTokenService);
+        String token = "Bearer " + jwtTokenService.createToken("U1", "default", "user", List.of("ROLE_1"));
+
+        Assertions.assertFalse(service.authorize(token, "GET", "/api/a"));
+        Mockito.verifyNoInteractions(roleMapper, resourceMapper);
+    }
+
+    @Test
+    void shouldReturnInactiveWhenTokenUserMissing() {
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties());
+        UserMapper userMapper = Mockito.mock(UserMapper.class);
+        Mockito.when(userMapper.selectByUserId("U1")).thenReturn(null);
+        AuthServiceImpl service = service(userMapper, Mockito.mock(RoleMapper.class), Mockito.mock(ApiResourceMapper.class), jwtTokenService);
+        String token = "Bearer " + jwtTokenService.createToken("U1", "default", "user", List.of("ROLE_1"));
+
+        Assertions.assertFalse(service.introspect(token).isActive());
+    }
+
     private AuthServiceImpl service(RoleMapper roleMapper, ApiResourceMapper resourceMapper, JwtTokenService jwtTokenService) {
+        UserMapper userMapper = Mockito.mock(UserMapper.class);
+        Mockito.when(userMapper.selectByUserId("U1")).thenReturn(user("U1", 1));
+        return service(userMapper, roleMapper, resourceMapper, jwtTokenService);
+    }
+
+    private AuthServiceImpl service(UserMapper userMapper, RoleMapper roleMapper, ApiResourceMapper resourceMapper, JwtTokenService jwtTokenService) {
         return new AuthServiceImpl(
-                Mockito.mock(UserMapper.class),
+                userMapper,
                 roleMapper,
                 Mockito.mock(UserRoleMapper.class),
                 resourceMapper,
@@ -83,6 +120,15 @@ class AuthServiceImplTest {
         role.setRoleCode(code);
         role.setEnabled(true);
         return role;
+    }
+
+    private User user(String userId, Integer status) {
+        User user = new User();
+        user.setUserId(userId);
+        user.setTenantId("default");
+        user.setUsername("user");
+        user.setStatus(status);
+        return user;
     }
 
     private ApiResource resource(Long id, String method, String path) {
