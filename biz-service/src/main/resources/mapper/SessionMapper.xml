@@ -2,4 +2,66 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.biz.mapper.SessionMapper">
+    <resultMap id="SessionMap" type="com.aicsp.biz.entity.Session">
+        <id column="id" property="id"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="title" property="title"/>
+        <result column="status" property="status"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <select id="listByOwner" resultMap="SessionMap">
+        SELECT id, session_id, user_id, tenant_id, title, status, created_by, created_at, updated_by, updated_at, deleted
+        FROM cs_session
+        WHERE deleted = FALSE
+          AND user_id = #{userId}
+          AND tenant_id = #{tenantId}
+        ORDER BY updated_at DESC, id DESC
+    </select>
+
+    <select id="findBySessionId" resultMap="SessionMap">
+        SELECT id, session_id, user_id, tenant_id, title, status, created_by, created_at, updated_by, updated_at, deleted
+        FROM cs_session
+        WHERE deleted = FALSE
+          AND session_id = #{sessionId}
+        LIMIT 1
+    </select>
+
+    <insert id="insertIgnore" parameterType="com.aicsp.biz.entity.Session">
+        INSERT INTO cs_session (
+            id, session_id, user_id, tenant_id, title, status, created_by, updated_by, deleted
+        )
+        VALUES (
+            #{id}, #{sessionId}, #{userId}, #{tenantId}, #{title}, #{status}, #{createdBy}, #{updatedBy}, FALSE
+        )
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <update id="updateByOwner">
+        UPDATE cs_session
+        SET
+            title = COALESCE(#{title}, title),
+            status = COALESCE(#{status}, status),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE deleted = FALSE
+          AND session_id = #{sessionId}
+          AND user_id = #{userId}
+          AND tenant_id = #{tenantId}
+    </update>
+
+    <update id="softDeleteByOwner">
+        UPDATE cs_session
+        SET deleted = TRUE,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE deleted = FALSE
+          AND session_id = #{sessionId}
+          AND user_id = #{userId}
+          AND tenant_id = #{tenantId}
+    </update>
 </mapper>

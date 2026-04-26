@@ -6,6 +6,7 @@ import com.aicsp.common.result.ResultCode;
 import com.aicsp.common.util.JsonUtils;
 import com.aicsp.stream.dto.request.ChatRequest;
 import com.aicsp.stream.service.ChatStreamService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -29,7 +30,7 @@ public class ChatStreamController {
      * @return SSE 事件流，持续返回模型响应片段，异常时返回 error 事件
      */
     @PostMapping(value = "/api/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest request, ServerHttpRequest httpRequest) {
+    public Flux<ServerSentEvent<String>> stream(@Valid @RequestBody ChatRequest request, ServerHttpRequest httpRequest) {
         return chatStreamService.stream(request, httpRequest)
                 .onErrorResume(BizException.class, e -> Flux.just(ServerSentEvent.<String>builder()
                         .event("error")

@@ -2,13 +2,17 @@ package com.aicsp.biz.controller;
 
 import com.aicsp.common.result.R;
 import com.aicsp.biz.dto.request.SessionCreateRequest;
+import com.aicsp.biz.dto.request.SessionUpdateRequest;
 import com.aicsp.biz.dto.response.SessionDTO;
 import com.aicsp.biz.service.SessionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,6 +43,18 @@ public class SessionController {
     @PostMapping
     public R<?> createSession(@Valid @RequestBody SessionCreateRequest request) {
         sessionService.createSession(request);
+        return R.ok();
+    }
+
+    @PutMapping("/{sessionId}")
+    public R<?> updateSession(@PathVariable String sessionId, @RequestBody SessionUpdateRequest request) {
+        sessionService.updateSession(sessionId, request);
+        return R.ok();
+    }
+
+    @DeleteMapping("/{sessionId}")
+    public R<?> deleteSession(@PathVariable String sessionId) {
+        sessionService.deleteSession(sessionId);
         return R.ok();
     }
 }

@@ -8,5 +8,9 @@ public interface MessageService {
 
     List<MessageDTO> listMessages(String sessionId);
 
+    MessageDTO getMessage(String messageId);
+
+    void deleteMessage(String messageId);
+
     void saveCompletedMessage(MessageCompletedEvent event);
 }

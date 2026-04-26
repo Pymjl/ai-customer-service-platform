@@ -1,6 +1,7 @@
 package com.aicsp.stream.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -15,4 +16,19 @@ public class ChatRequest {
 
     @NotBlank(message = "message 不能为空")
     private String message;
+
+    private String locale;
+
+    private KnowledgeSelection knowledgeSelection;
+
+    @Data
+    @NoArgsConstructor
+    public static class KnowledgeSelection {
+        private String mode;
+        private Boolean includePublic;
+        private Boolean includePersonal;
+        private List<String> documentIds;
+        private List<String> categoryIds;
+        private List<String> tagIds;
+    }
 }

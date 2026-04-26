@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aicsp.biz.mapper.KnowledgeMapper">
+    <resultMap id="DocumentMap" type="com.aicsp.biz.entity.KnowledgeDocument">
+        <id column="id" property="id"/>
+        <result column="document_id" property="documentId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="scope" property="scope"/>
+        <result column="owner_user_id" property="ownerUserId"/>
+        <result column="title" property="title"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="object_path" property="objectPath"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="product_line" property="productLine"/>
+        <result column="status" property="status"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <resultMap id="CategoryMap" type="com.aicsp.biz.entity.KnowledgeCategory">
+        <id column="id" property="id"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="scope" property="scope"/>
+        <result column="owner_user_id" property="ownerUserId"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="name" property="name"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <resultMap id="TagMap" type="com.aicsp.biz.entity.KnowledgeTag">
+        <id column="id" property="id"/>
+        <result column="tag_id" property="tagId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="name" property="name"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <resultMap id="TaskMap" type="com.aicsp.biz.entity.KnowledgeIngestionTask">
+        <id column="task_id" property="taskId"/>
+        <result column="document_id" property="documentId"/>
+        <result column="task_type" property="taskType"/>
+        <result column="status" property="status"/>
+        <result column="progress" property="progress"/>
+        <result column="chunk_count" property="chunkCount"/>
+        <result column="embedding_model" property="embeddingModel"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="DocumentColumns">
+        id, document_id, tenant_id, scope, owner_user_id, title, source_type, object_path, category_id,
+        product_line, status, enabled, created_by, created_at, updated_by, updated_at, deleted
+    </sql>
+
+    <sql id="DocumentWhere">
+        deleted = FALSE
+        AND tenant_id = #{tenantId}
+        AND scope = #{scope}
+        <if test="ownerUserId != null and ownerUserId != ''">
+            AND owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+            AND owner_user_id IS NULL
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND title ILIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <if test="categoryId != null and categoryId != ''">
+            AND category_id = #{categoryId}
+        </if>
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="enabled != null">
+            AND enabled = #{enabled}
+        </if>
+    </sql>
+
+    <select id="listDocuments" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE <include refid="DocumentWhere"/>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDocuments" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_document
+        WHERE <include refid="DocumentWhere"/>
+    </select>
+
+    <select id="findDocument" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE document_id = #{documentId}
+          AND deleted = FALSE
+        LIMIT 1
+    </select>
+
+    <insert id="insertDocument" parameterType="com.aicsp.biz.entity.KnowledgeDocument">
+        INSERT INTO kb_document (
+            id, document_id, tenant_id, scope, owner_user_id, title, source_type, object_path, category_id,
+            product_line, status, enabled, created_by, updated_by, deleted
+        )
+        VALUES (
+            #{id}, #{documentId}, #{tenantId}, #{scope}, #{ownerUserId}, #{title}, #{sourceType}, #{objectPath},
+            #{categoryId}, #{productLine}, #{status}, #{enabled}, #{createdBy}, #{updatedBy}, FALSE
+        )
+    </insert>
+
+    <update id="updateDocument" parameterType="com.aicsp.biz.entity.KnowledgeDocument">
+        UPDATE kb_document
+        SET title = #{title},
+            source_type = #{sourceType},
+            category_id = #{categoryId},
+            product_line = #{productLine},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = #{documentId}
+          AND deleted = FALSE
+    </update>
+
+    <update id="updateDocumentState">
+        UPDATE kb_document
+        SET
+        <if test="status != null and status != ''">
+            status = #{status},
+        </if>
+        <if test="enabled != null">
+            enabled = #{enabled},
+        </if>
+            updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = #{documentId}
+          AND deleted = FALSE
+    </update>
+
+    <update id="softDeleteDocument">
+        UPDATE kb_document
+        SET deleted = TRUE,
+            status = 'DELETED',
+            enabled = FALSE,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = #{documentId}
+          AND deleted = FALSE
+    </update>
+
+    <select id="listDocumentTags" resultType="string">
+        SELECT t.name
+        FROM kb_document_tag dt
+        INNER JOIN kb_tag t ON t.tag_id = dt.tag_id AND t.deleted = FALSE
+        WHERE dt.document_id = #{documentId}
+        ORDER BY t.name ASC
+    </select>
+
+    <delete id="deleteDocumentTags">
+        DELETE FROM kb_document_tag WHERE document_id = #{documentId}
+    </delete>
+
+    <select id="findTagByName" resultMap="TagMap">
+        SELECT id, tag_id, tenant_id, name, created_at, updated_at, deleted
+        FROM kb_tag
+        WHERE tenant_id = #{tenantId}
+          AND name = #{name}
+          AND deleted = FALSE
+        LIMIT 1
+    </select>
+
+    <insert id="insertTag" parameterType="com.aicsp.biz.entity.KnowledgeTag">
+        INSERT INTO kb_tag (id, tag_id, tenant_id, name, deleted)
+        VALUES (#{id}, #{tagId}, #{tenantId}, #{name}, FALSE)
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <insert id="insertDocumentTag">
+        INSERT INTO kb_document_tag (document_id, tag_id)
+        VALUES (#{documentId}, #{tagId})
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <select id="listCategories" resultMap="CategoryMap">
+        SELECT id, category_id, tenant_id, scope, owner_user_id, parent_id, name, sort_order, created_at, updated_at, deleted
+        FROM kb_category
+        WHERE tenant_id = #{tenantId}
+          AND scope = #{scope}
+          AND deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+          AND owner_user_id IS NULL
+        </if>
+        ORDER BY sort_order ASC, created_at ASC
+    </select>
+
+    <insert id="insertCategory" parameterType="com.aicsp.biz.entity.KnowledgeCategory">
+        INSERT INTO kb_category (id, category_id, tenant_id, scope, owner_user_id, parent_id, name, sort_order, deleted)
+        VALUES (#{id}, #{categoryId}, #{tenantId}, #{scope}, #{ownerUserId}, #{parentId}, #{name}, #{sortOrder}, FALSE)
+    </insert>
+
+    <select id="findCategory" resultMap="CategoryMap">
+        SELECT id, category_id, tenant_id, scope, owner_user_id, parent_id, name, sort_order, created_at, updated_at, deleted
+        FROM kb_category
+        WHERE category_id = #{categoryId}
+          AND deleted = FALSE
+        LIMIT 1
+    </select>
+
+    <update id="updateCategory" parameterType="com.aicsp.biz.entity.KnowledgeCategory">
+        UPDATE kb_category
+        SET parent_id = #{parentId},
+            name = #{name},
+            sort_order = #{sortOrder},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE category_id = #{categoryId}
+          AND scope = #{scope}
+          AND deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND owner_user_id = #{ownerUserId}
+        </if>
+    </update>
+
+    <update id="deleteCategory">
+        UPDATE kb_category
+        SET deleted = TRUE,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE category_id = #{categoryId}
+          AND tenant_id = #{tenantId}
+          AND scope = #{scope}
+          AND deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+          AND owner_user_id IS NULL
+        </if>
+    </update>
+
+    <select id="countCategoryDocuments" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_document
+        WHERE category_id = #{categoryId}
+          AND deleted = FALSE
+    </select>
+
+    <select id="listTags" resultMap="TagMap">
+        SELECT id, tag_id, tenant_id, name, created_at, updated_at, deleted
+        FROM kb_tag
+        WHERE tenant_id = #{tenantId}
+          AND deleted = FALSE
+        <if test="keyword != null and keyword != ''">
+          AND name ILIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        ORDER BY name ASC
+    </select>
+
+    <select id="countTagDocuments" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_document_tag dt
+        INNER JOIN kb_document d ON d.document_id = dt.document_id AND d.deleted = FALSE
+        WHERE dt.tag_id = #{tagId}
+    </select>
+
+    <insert id="insertTask" parameterType="com.aicsp.biz.entity.KnowledgeIngestionTask">
+        INSERT INTO kb_ingestion_task (
+            task_id, document_id, task_type, status, progress, chunk_count, embedding_model, retry_count, error_message
+        )
+        VALUES (
+            #{taskId}, #{documentId}, #{taskType}, #{status}, #{progress}, #{chunkCount}, #{embeddingModel}, #{retryCount}, #{errorMessage}
+        )
+    </insert>
+
+    <select id="findLatestTask" resultMap="TaskMap">
+        SELECT task_id, document_id, task_type, status, progress, chunk_count, embedding_model, retry_count,
+               error_message, created_at, updated_at
+        FROM kb_ingestion_task
+        WHERE document_id = #{documentId}
+        ORDER BY
+          CASE WHEN status NOT IN ('READY', 'FAILED', 'FAILED_RETRYABLE', 'DELETED') THEN 0 ELSE 1 END,
+          updated_at DESC
+        LIMIT 1
+    </select>
+
+    <update id="updateTask" parameterType="com.aicsp.biz.entity.KnowledgeIngestionTask">
+        UPDATE kb_ingestion_task
+        SET status = #{status},
+            progress = #{progress},
+            chunk_count = #{chunkCount},
+            embedding_model = #{embeddingModel},
+            error_message = #{errorMessage},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_id = #{taskId}
+    </update>
+
+    <select id="countSelectable" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_document
+        WHERE tenant_id = #{tenantId}
+          AND scope = #{scope}
+          AND status = 'READY'
+          AND enabled = TRUE
+          AND deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+          AND owner_user_id IS NULL
+        </if>
+    </select>
+
+    <select id="listSelectableDocuments" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE tenant_id = #{tenantId}
+          AND status = 'READY'
+          AND enabled = TRUE
+          AND deleted = FALSE
+          AND (
+            (scope = 'PUBLIC' AND owner_user_id IS NULL)
+            OR (scope = 'PERSONAL' AND owner_user_id = #{ownerUserId})
+          )
+        ORDER BY updated_at DESC
+    </select>
+</mapper>

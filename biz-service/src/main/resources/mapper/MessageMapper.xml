@@ -2,4 +2,78 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.biz.mapper.MessageMapper">
+    <resultMap id="MessageMap" type="com.aicsp.biz.entity.Message">
+        <id column="id" property="id"/>
+        <result column="message_id" property="messageId"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="user_msg" property="userMsg"/>
+        <result column="ai_reply" property="aiReply"/>
+        <result column="status" property="status"/>
+        <result column="trace_id" property="traceId"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <select id="listByOwner" resultMap="MessageMap">
+        SELECT m.id, m.message_id, m.session_id, m.user_id, m.tenant_id, m.user_msg, m.ai_reply, m.status,
+               m.trace_id, m.created_by, m.created_at, m.updated_by, m.updated_at, m.deleted
+        FROM cs_message m
+        INNER JOIN cs_session s ON s.session_id = m.session_id AND s.deleted = FALSE
+        WHERE m.deleted = FALSE
+          AND m.user_id = #{userId}
+          AND m.tenant_id = #{tenantId}
+          AND s.user_id = #{userId}
+          AND s.tenant_id = #{tenantId}
+        <if test="sessionId != null and sessionId != ''">
+          AND m.session_id = #{sessionId}
+        </if>
+        ORDER BY m.created_at ASC, m.id ASC
+    </select>
+
+    <select id="findByMessageId" resultMap="MessageMap">
+        SELECT id, message_id, session_id, user_id, tenant_id, user_msg, ai_reply, status,
+               trace_id, created_by, created_at, updated_by, updated_at, deleted
+        FROM cs_message
+        WHERE deleted = FALSE
+          AND message_id = #{messageId}
+        LIMIT 1
+    </select>
+
+    <select id="findByOwner" resultMap="MessageMap">
+        SELECT id, message_id, session_id, user_id, tenant_id, user_msg, ai_reply, status,
+               trace_id, created_by, created_at, updated_by, updated_at, deleted
+        FROM cs_message
+        WHERE deleted = FALSE
+          AND message_id = #{messageId}
+          AND user_id = #{userId}
+          AND tenant_id = #{tenantId}
+        LIMIT 1
+    </select>
+
+    <insert id="insertIgnore" parameterType="com.aicsp.biz.entity.Message">
+        INSERT INTO cs_message (
+            id, message_id, session_id, user_id, tenant_id, user_msg, ai_reply, status, trace_id,
+            created_by, updated_by, deleted
+        )
+        VALUES (
+            #{id}, #{messageId}, #{sessionId}, #{userId}, #{tenantId}, #{userMsg}, #{aiReply}, #{status}, #{traceId},
+            #{createdBy}, #{updatedBy}, FALSE
+        )
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <update id="softDeleteByOwner">
+        UPDATE cs_message
+        SET deleted = TRUE,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE deleted = FALSE
+          AND message_id = #{messageId}
+          AND user_id = #{userId}
+          AND tenant_id = #{tenantId}
+    </update>
 </mapper>
