@@ -1,6 +1,6 @@
 # AI Customer Service Platform
 
-AI Customer Service Platform 是一个基于 Java 21、Spring Boot 3.5、Spring Cloud Gateway、Vue 3 的 AI 客服平台。当前项目采用多模块微服务结构，包含统一网关、用户与权限中心、流式对话服务、业务会话服务、公共模块和前端管理界面。
+AI Customer Service Platform 是一个基于 Java 21、Spring Boot 3.5、Spring Cloud Gateway、Vue 3 的 AI 客服平台。当前项目采用多模块微服务结构，包含统一网关、用户与权限中心、SSE 流式转发服务、业务与知识库服务、公共模块、Python AI 引擎和前端管理界面。
 
 当前仓库以本地开发环境为主，`prod` 配置暂时与 `dev` 保持一致。上线前必须替换所有本地默认密码、JWT 密钥、内部调用 token 和对象存储凭据。
 
@@ -11,8 +11,9 @@ ai-customer-service-platform/
 ├── common/             # 公共返回体、异常、请求头常量、JSON 和 ID 工具
 ├── gateway-service/    # API 网关、鉴权过滤、限流、用户身份头透传
 ├── user-service/       # 认证、用户、角色、权限、资源、头像上传
-├── stream-service/     # SSE 对话流、内部查询接口、RocketMQ 消息发布
-├── biz-service/        # 会话、消息、RocketMQ 消息消费
+├── stream-service/     # SSE 对话流转发，仅负责前端与 Python 引擎之间的流式转发
+├── biz-service/        # 会话、消息、知识库管理、Function Call 防腐与业务接口
+├── ai-engine/          # Python AI 引擎，负责 Agent、RAG、模型调用和流式生成
 ├── frontend/           # Vue 3 + Element Plus 前端
 ├── docs/               # SDD 和开发文档
 └── pom.xml             # Maven 多模块父工程
@@ -24,12 +25,13 @@ ai-customer-service-platform/
 | --- | --- |
 | 后端语言 | Java 21 |
 | 后端框架 | Spring Boot 3.5.13, Spring Cloud 2025.0.2 |
+| AI 引擎 | Python, uv, FastAPI, LangChain, LangGraph |
 | 网关 | Spring Cloud Gateway WebFlux |
 | 安全 | Spring Security, 自定义 JWT access token, Redis refresh token |
 | 数据库 | PostgreSQL, Flyway, MyBatis |
 | 缓存/会话 | Redis |
 | 服务发现 | Nacos |
-| 消息队列 | RocketMQ |
+| 消息队列 | RocketMQ（可选，用于后续知识库异步任务） |
 | 文件存储 | MinIO |
 | 前端 | Vue 3, Vite, TypeScript, Pinia, Element Plus |
 
@@ -39,12 +41,13 @@ ai-customer-service-platform/
 | --- | ---: | --- |
 | `gateway-service` | `18080` | 外部统一入口 |
 | `user-service` | `18081` | 认证、用户、RBAC |
-| `stream-service` | `18082` | 流式聊天、内部查询 |
-| `biz-service` | `18083` | 会话和消息 |
+| `stream-service` | `18082` | SSE 流式聊天转发 |
+| `biz-service` | `18083` | 会话、消息、知识库和工具防腐 |
+| `ai-engine` | `8000` | Python AI 引擎 |
 | `frontend` | `5173` | Vite 开发服务器默认端口 |
 | Nacos | `8848` | 服务注册发现 |
 | Redis | `6379` | token、限流、缓存 |
-| RocketMQ NameServer | `9876` | 消息队列 |
+| RocketMQ NameServer | `9876` | 可选消息队列 |
 | MinIO | `9000` | 对象存储 API |
 
 ## 架构图
@@ -65,14 +68,14 @@ flowchart LR
     MQ[["RocketMQ"]]
     Nacos[("Nacos")]
     Minio[("MinIO")]
-    Python["Python AI Engine<br/>可选/预留"]
+    Python["ai-engine<br/>Python"]
 
     Client --> FE
     FE -->|"HTTP / API"| Gateway
 
     Gateway -->|"/api/auth/**<br/>/api/users/**<br/>/api/roles/**<br/>/api/resources/**"| User
     Gateway -->|"/api/chat/**"| Stream
-    Gateway -->|"/api/sessions/**<br/>/api/messages/**"| Biz
+    Gateway -->|"/api/sessions/**<br/>/api/messages/**<br/>/api/knowledge/**"| Biz
 
     Gateway -->|"rate limit"| Redis
     Gateway -->|"introspect / authorize"| User
@@ -83,13 +86,13 @@ flowchart LR
     User -->|"avatar"| Minio
     User --> Nacos
 
-    Stream -->|"message completed event"| MQ
-    Stream -->|"reserved WebClient"| Python
+    Stream -->|"SSE proxy"| Python
     Stream --> Nacos
 
     Biz --> BizDB
     Biz --> Redis
-    Biz -->|"consume event"| MQ
+    Biz -.->|"optional async knowledge tasks"| MQ
+    Python -->|"message completed<br/>function call tools"| Biz
     Biz --> Nacos
 
     Common -.-> Gateway
@@ -193,17 +196,17 @@ sequenceDiagram
     actor Client
     participant Gateway as gateway-service
     participant Stream as stream-service
-    participant RocketMQ
     participant Biz as biz-service
     participant BizDB as PostgreSQL aicsp_biz
+    participant Python as ai-engine
 
     Client->>Gateway: POST /api/chat/stream<br/>Bearer accessToken
     Gateway->>Gateway: auth + rate limit
     Gateway->>Stream: forward request + identity headers
-    Stream->>Stream: create SSE events
+    Stream->>Python: proxy stream request + identity headers
+    Python-->>Stream: EngineEvent stream
     Stream-->>Client: text/event-stream
-    Stream->>RocketMQ: MessageCompletedEvent
-    RocketMQ->>Biz: consume event
+    Python->>Biz: POST /internal/chat/message-completed
     Biz->>BizDB: persist session/message
 ```
 
@@ -243,7 +246,7 @@ CREATE DATABASE aicsp_biz;
 1. PostgreSQL
 2. Redis
 3. Nacos
-4. RocketMQ
+4. RocketMQ（第一阶段可选；启用知识库异步任务时需要）
 5. MinIO
 6. `user-service`
 7. `biz-service`
@@ -372,16 +375,13 @@ VITE_API_PROXY_TARGET=http://localhost:18080
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `server.port` | `18082` | 流式服务端口 |
-| `rocketmq.name-server` | `localhost:9876` | RocketMQ NameServer |
-| `rocketmq.producer.group` | `stream-service-producer` | 生产者组 |
 | `python.engine.base-url` | `http://localhost:8000` | Python AI 引擎地址 |
 | `python.engine.max-connections` | `200` | WebClient 最大连接数 |
 | `python.engine.response-timeout` | `310000` | 响应超时 |
 | `stream.sse.heartbeat-interval` | `15s` | SSE 心跳间隔 |
 | `stream.sse.max-duration` | `300s` | SSE 最大持续时间 |
-| `stream.internal-token` | `change-me` 或配置值 | 内部接口 token |
 
-说明：当前 `stream-service` 使用 `StreamModuleProperties` 读取 `stream.internal-token`。请确保配置文件中使用 `stream.internal-token`，不要再使用旧的 `internal.token`。
+说明：`stream-service` 只负责 SSE 流式转发，不提供 `/internal/**` 工具接口，也不发布 RocketMQ 消息。
 
 ### biz-service
 
@@ -399,7 +399,7 @@ VITE_API_PROXY_TARGET=http://localhost:18080
 | `spring.data.redis.database` | `2` | Redis DB |
 | `spring.flyway.enabled` | `true` | 自动迁移 |
 | `rocketmq.name-server` | `localhost:9876` | RocketMQ NameServer |
-| `rocketmq.consumer.group` | `biz-service-consumer` | 消费者组 |
+| `rocketmq.consumer.group` | `biz-service-consumer` | 后续知识库异步任务消费者组；对话完成主链路不依赖 MQ |
 | `aicsp.worker-id` | `2` | 分布式 ID worker id |
 
 ## 主要 API
@@ -449,14 +449,19 @@ VITE_API_PROXY_TARGET=http://localhost:18080
 | `GET` | `/api/sessions` | 会话列表 |
 | `POST` | `/api/sessions` | 创建会话 |
 | `GET` | `/api/messages` | 消息列表 |
-| `GET` | `/internal/{functionName}` | stream-service 内部查询接口 |
+| `GET` | `/api/knowledge/selectable` | 智能问答可启用知识库范围 |
+| `GET` | `/api/knowledge/public/documents` | 公共知识库列表 |
+| `GET` | `/api/knowledge/personal/documents` | 我的知识库列表 |
+| `POST` | `/api/knowledge/personal/documents/{documentId}/contribute` | 个人知识贡献申请 |
+| `POST` | `/internal/chat/message-completed` | biz-service 内部消息完成接口，仅供 Python 引擎调用 |
+| `POST` | `/internal/tools/{toolName}` | biz-service Function Call 防腐接口，仅供 Python 引擎调用 |
 
 ## 测试与验证
 
 后端相关模块：
 
 ```bash
-mvn -pl common,user-service,gateway-service,stream-service -am test
+mvn -pl common,user-service,gateway-service,stream-service,biz-service -am test
 ```
 
 全量后端：
@@ -477,7 +482,7 @@ npm run build
 
 本项目当前还处于本地开发阶段。部署到服务器时建议按以下顺序处理：
 
-1. 使用独立 PostgreSQL、Redis、Nacos、RocketMQ、MinIO 实例。
+1. 使用独立 PostgreSQL、Redis、Nacos、MinIO 实例；如启用知识库异步任务，再部署独立 RocketMQ 实例。
 2. 为每个服务建立独立配置文件或环境变量注入机制。
 3. 替换所有默认密码、JWT secret、internal token、MinIO 密钥。
 4. 禁止公网直接访问 `user-service`、`stream-service`、`biz-service`，只暴露 `gateway-service` 和前端。
@@ -504,5 +509,5 @@ npm run build
 - 当前 `prod` 配置暂时与 `dev` 保持一致，仅适合本地开发或内网联调。
 - refresh token 依赖 Redis；Redis 不可用会导致登录、刷新和登出不可用。
 - access token 过期后，前端会用 refresh token 调用 `/api/auth/refresh`，成功后自动重试一次原请求。
-- `stream-service` 的 Python 引擎调用已有客户端配置，但实际业务流是否完全依赖 Python 引擎需要按后续业务实现继续确认。
+- `stream-service` 设计上只保留 SSE 流式转发职责；Function Call 防腐、消息完成持久化和其它业务接口由 `biz-service` 承担。
 - 前端 `vite build` 可能出现 chunk 超过 500 kB 的警告，不影响构建产物生成。

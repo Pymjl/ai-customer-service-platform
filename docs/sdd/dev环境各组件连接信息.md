@@ -15,7 +15,7 @@
 | `gateway-service` | `18080` | 统一网关入口 |
 | `user-service` | `18081` | 用户、角色、权限服务 |
 | `stream-service` | `18082` | SSE 对话流服务 |
-| `biz-service` | `18083` | 会话、消息业务服务 |
+| `biz-service` | `18083` | 会话、消息、知识库与工具防腐服务 |
 
 ---
 
