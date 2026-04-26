@@ -34,6 +34,7 @@ class Retriever:
             )
         query_embedding = (await self._embedding_model.embed_texts([request.query]))[0]
         hits = await self._store.similarity_search(request, query_embedding)
+        hits = await self._store.expand_parent_hits(hits)
         response = RetrieveResponse(
             query=request.query,
             hits=hits,

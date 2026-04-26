@@ -3,15 +3,16 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from aicsp_engine.core.prompts import (
+    CUSTOMER_SERVICE_GLOBAL_PROMPT,
+    DEGRADED_SECTION_TEMPLATE,
+    KNOWLEDGE_SNIPPET_TEMPLATE,
+    NO_CONTEXT_MESSAGE,
+    RAG_CONTEXT_SECTION_TEMPLATE,
+    TOOL_RESULT_SECTION_TEMPLATE,
+    USER_PROMPT_TEMPLATE,
+)
 from aicsp_engine.models.rag import RetrieveHit
-
-
-SYSTEM_PROMPT = """你是智能客服助手。请遵守以下要求：
-1. 优先基于已提供的知识库片段和工具结果回答。
-2. 不要编造订单、物流、客户资料或政策条款。
-3. 信息不足时，明确说明需要用户补充哪些信息。
-4. 涉及退款、支付、账号、安全和投诉升级时保持谨慎，并建议转人工或按流程处理。
-5. 回答要简洁、可执行，必要时列出步骤。"""
 
 
 def format_rag_context(hits: list[RetrieveHit], max_items: int = 5) -> tuple[str, list[dict[str, Any]]]:
@@ -30,13 +31,20 @@ def format_rag_context(hits: list[RetrieveHit], max_items: int = 5) -> tuple[str
         if field:
             source += f" / {field}"
         context_parts.append(
-            f"[知识片段 {index}]\n来源：{source}\n相关分数：{hit.score:.4f}\n内容：{hit.content}"
+            KNOWLEDGE_SNIPPET_TEMPLATE.format(
+                index=index,
+                source=source,
+                score=hit.score,
+                content=hit.content,
+            )
         )
         citations.append(
             {
                 "documentId": hit.documentId,
                 "chunkId": hit.chunkId,
                 "parentChunkId": hit.parentChunkId,
+                "matchedChildIds": _string_list(metadata.get("matched_child_ids")),
+                "matchedFields": _string_list(metadata.get("matched_child_fields")),
                 "title": title,
                 "caseId": case_id,
                 "field": field,
@@ -44,6 +52,12 @@ def format_rag_context(hits: list[RetrieveHit], max_items: int = 5) -> tuple[str
             }
         )
     return "\n\n".join(context_parts), citations
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item is not None]
 
 
 def build_prompt_messages(
@@ -56,20 +70,23 @@ def build_prompt_messages(
 ) -> list[dict[str, Any]]:
     sections: list[str] = []
     if rag_context:
-        sections.append("【检索级上下文】\n" + rag_context)
+        sections.append(RAG_CONTEXT_SECTION_TEMPLATE.format(rag_context=rag_context))
     if tool_result:
         sections.append(
-            "【工具结果】\n"
-            + json.dumps(
-                {"tool": tool_name, "result": tool_result},
-                ensure_ascii=False,
-                separators=(",", ":"),
+            TOOL_RESULT_SECTION_TEMPLATE.format(
+                tool_result=json.dumps(
+                    {"tool": tool_name, "result": tool_result},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
             )
         )
     if degraded:
-        sections.append(f"【降级状态】{fallback_reason or 'unknown'}。不得扩大权限或编造未取得的信息。")
-    context = "\n\n".join(sections) if sections else "本轮没有可用的知识库片段或实时工具结果。"
+        sections.append(
+            DEGRADED_SECTION_TEMPLATE.format(fallback_reason=fallback_reason or "unknown")
+        )
+    context = "\n\n".join(sections) if sections else NO_CONTEXT_MESSAGE
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"{context}\n\n【用户问题】\n{user_message}"},
+        {"role": "system", "content": CUSTOMER_SERVICE_GLOBAL_PROMPT},
+        {"role": "user", "content": USER_PROMPT_TEMPLATE.format(context=context, user_message=user_message)},
     ]

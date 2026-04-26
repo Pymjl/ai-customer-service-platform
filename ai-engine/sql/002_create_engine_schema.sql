@@ -1,11 +1,11 @@
--- ai-engine pgvector schema 初始化脚本
--- 执行方式示例：
---   psql -h localhost -U postgres -d aicsp_engine -f ai-engine/sql/002_create_engine_schema.sql
+-- ai-engine pgvector schema 初始化脚本（IDEA / DataGrip PG Console 可直接执行）
 --
 -- 说明：
--- 1. 需要 PostgreSQL 已安装 pgvector 扩展。
--- 2. 当前默认 embedding 模型为 qwen3-embedding:8b，向量维度使用 4096。
--- 3. 如果本地 Ollama 模型实际返回维度不同，请同步修改：
+-- 1. 请先连接到 aicsp_engine 数据库，再执行本脚本。
+-- 2. 需要 PostgreSQL 已安装 pgvector 扩展。
+-- 3. 当前 embedding 模型为 qwen3-embedding:8b，已通过 scripts/check_embedding_dimension.py
+--    调用本地 Ollama OpenAI 兼容接口实测向量维度为 4096。
+-- 4. 如果本地 Ollama 模型实际返回维度不同，请同步修改：
 --    - .env 中 AICSP_EMBEDDING_DIMENSIONS
 --    - 本脚本 engine_embedding.embedding vector(4096)
 
@@ -108,10 +108,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_engine_embedding_chunk_model
     ON engine_service.engine_embedding (chunk_id, model)
     WHERE deleted = FALSE;
 
-CREATE INDEX IF NOT EXISTS idx_engine_embedding_vector_cosine
-    ON engine_service.engine_embedding
-    USING hnsw (embedding vector_cosine_ops)
-    WHERE deleted = FALSE;
+-- 注意：qwen3-embedding:8b 实测为 4096 维，当前 pgvector 的 HNSW 索引不支持
+-- 超过 2000 维的 vector 列，因此这里不创建向量 ANN 索引。
+-- 第一阶段使用精确向量相似度排序，并依赖 chunk ACL / 文档 / 工单等普通索引先缩小候选集。
+-- 如果后续更换为 <= 2000 维 embedding 模型，可再创建：
+-- CREATE INDEX IF NOT EXISTS idx_engine_embedding_vector_cosine
+--     ON engine_service.engine_embedding
+--     USING hnsw (embedding vector_cosine_ops)
+--     WHERE deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_engine_ingestion_task_doc
     ON engine_service.engine_ingestion_task (document_id, status);

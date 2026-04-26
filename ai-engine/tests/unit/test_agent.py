@@ -1,8 +1,8 @@
 import pytest
 
 from aicsp_engine.agent.graph import CustomerServiceAgent
-from aicsp_engine.agent.policies import HUMAN_HANDOFF_MESSAGE
 from aicsp_engine.core.config import Settings
+from aicsp_engine.core.prompts import HUMAN_HANDOFF_MESSAGE
 from aicsp_engine.models.chat import EngineRequest
 
 
@@ -32,4 +32,3 @@ async def test_tool_failure_uses_human_handoff_message(monkeypatch: pytest.Monke
     assert events[-1].data == HUMAN_HANDOFF_MESSAGE
     assert "抱歉" in events[-1].data
     assert "人工客服" in events[-1].data
-

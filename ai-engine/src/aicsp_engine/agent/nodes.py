@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from aicsp_engine.agent.policies import HUMAN_HANDOFF_MESSAGE, classify_intent, extract_business_identifier
+from aicsp_engine.agent.policies import classify_intent, extract_business_identifier
 from aicsp_engine.agent.state import AgentState
 from aicsp_engine.core.config import Settings
+from aicsp_engine.core.prompts import HUMAN_HANDOFF_MESSAGE
 from aicsp_engine.models.chat import KnowledgeSelection
 from aicsp_engine.models.rag import RetrieveRequest
 from aicsp_engine.rag.prompt_context import build_prompt_messages, format_rag_context

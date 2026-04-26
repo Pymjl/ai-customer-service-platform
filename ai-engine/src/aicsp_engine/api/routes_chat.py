@@ -4,8 +4,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from aicsp_engine.agent.graph import CustomerServiceAgent
-from aicsp_engine.agent.policies import HUMAN_HANDOFF_MESSAGE
 from aicsp_engine.core.config import get_settings
+from aicsp_engine.core.prompts import HUMAN_HANDOFF_MESSAGE
 from aicsp_engine.models.chat import EngineRequest
 from aicsp_engine.models.events import EngineEvent, ndjson_line
 

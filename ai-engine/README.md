@@ -24,3 +24,9 @@ uv run uvicorn aicsp_engine.main:app --reload --host 0.0.0.0 --port 8000
 uv run pytest
 uv run ruff check .
 ```
+
+检测本地 Ollama embedding 模型实际向量维度：
+
+```bash
+uv run python scripts/check_embedding_dimension.py
+```
