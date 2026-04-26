@@ -13,6 +13,8 @@ public class Role {
     private Long id;
     private String roleCode;
     private String roleName;
+    private String description;
+    private Boolean enabled;
     private Long createdBy;
     private OffsetDateTime createdAt;
     private Long updatedBy;

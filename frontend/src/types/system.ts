@@ -1,5 +1,5 @@
 export interface ApiResult<T> {
-  code: number
+  succeed: boolean
   message: string
   data: T
 }
@@ -106,7 +106,7 @@ export interface RoleItem {
   createdAt?: string
 }
 
-export type ResourceType = 'MENU' | 'BUTTON' | 'API'
+export type ResourceType = 'MENU' | 'BUTTON' | 'API' | 'service' | 'package' | 'controller' | 'api'
 
 export interface ResourceItem {
   id: number | string
@@ -119,6 +119,8 @@ export interface ResourceItem {
   path?: string
   methodName?: string
   description?: string
+  requestExample?: string
+  responseExample?: string
   enabled?: boolean
   name?: string
   code?: string
@@ -127,4 +129,13 @@ export interface ResourceItem {
   icon?: string
   sort?: number
   children?: ResourceItem[]
+}
+
+export interface ResourceTreeNode {
+  id: number | string
+  label: string
+  type: ResourceType | string
+  disabled?: boolean
+  resource?: ResourceItem
+  children?: ResourceTreeNode[]
 }

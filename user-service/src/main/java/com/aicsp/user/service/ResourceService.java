@@ -9,6 +9,7 @@ public interface ResourceService {
     List<ApiResourceDTO> listResources();
     List<ResourceTreeNode> tree();
     ResourceSyncResponse sync();
+    void updateResource(Long id, ApiResourceDTO request);
     void assignRoleResources(Long roleId, List<Long> resourceIds);
     List<Long> roleResourceIds(Long roleId);
 }

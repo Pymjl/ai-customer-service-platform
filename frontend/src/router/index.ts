@@ -2,9 +2,14 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const adminRoleCodes = new Set(['ADMIN', 'ROLE_ADMIN', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN', '管理员', '超级管理员'])
+const superAdminRoleCodes = new Set(['SUPER_ADMIN', 'ROLE_SUPER_ADMIN', '超级管理员'])
 
 function hasAdminRole(roles: string[] = []) {
   return roles.some((role) => adminRoleCodes.has(role.toUpperCase()) || adminRoleCodes.has(role))
+}
+
+function hasSuperAdminRole(roles: string[] = []) {
+  return roles.some((role) => superAdminRoleCodes.has(role.toUpperCase()) || superAdminRoleCodes.has(role))
 }
 
 const routes: RouteRecordRaw[] = [
@@ -59,13 +64,13 @@ const routes: RouteRecordRaw[] = [
         path: 'user-roles',
         name: 'UserRoleGrant',
         component: () => import('@/views/system/UserRoleGrant.vue'),
-        meta: { title: '用户角色授权', icon: 'Connection', requiresAdmin: true }
+        meta: { title: '用户角色授权', icon: 'Connection', requiresAdmin: true, requiresSuperAdmin: true }
       },
       {
         path: 'role-resources',
         name: 'RoleResourceGrant',
         component: () => import('@/views/system/RoleResourceGrant.vue'),
-        meta: { title: '角色资源授权', icon: 'Lock', requiresAdmin: true }
+        meta: { title: '角色资源授权', icon: 'Lock', requiresAdmin: true, requiresSuperAdmin: true }
       }
     ]
   }
@@ -93,6 +98,9 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.meta.requiresAdmin && !hasAdminRole(authStore.user?.roles)) {
+    return '/chat'
+  }
+  if (to.meta.requiresSuperAdmin && !hasSuperAdminRole(authStore.user?.roles)) {
     return '/chat'
   }
   return true

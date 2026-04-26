@@ -14,6 +14,8 @@ public class ApiResource {
     private String path;
     private String methodName;
     private String description;
+    private String requestExample;
+    private String responseExample;
     private Boolean enabled;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

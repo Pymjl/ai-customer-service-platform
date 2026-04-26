@@ -17,6 +17,12 @@ public class MessageController {
 
     private final MessageService messageService;
 
+    /**
+     * 用途：查询消息列表，可按会话过滤。
+     *
+     * @param sessionId 会话 ID，可为空；为空时查询全部可见消息
+     * @return 消息列表，包含会话 ID、发送方、内容和创建时间
+     */
     @GetMapping
     public R<List<MessageDTO>> listMessages(@RequestParam(required = false) String sessionId) {
         return R.ok(messageService.listMessages(sessionId));

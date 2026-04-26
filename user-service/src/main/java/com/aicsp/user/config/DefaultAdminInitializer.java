@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class DefaultAdminInitializer implements ApplicationRunner {
-    private static final String ADMIN_ROLE_CODE = "ADMIN";
+    private static final String ADMIN_ROLE_CODE = "SUPER_ADMIN";
 
     private final AdminProperties adminProperties;
     private final UserMapper userMapper;
@@ -57,7 +57,9 @@ public class DefaultAdminInitializer implements ApplicationRunner {
         Role adminRole = new Role();
         adminRole.setId(DistributedIdUtils.nextId());
         adminRole.setRoleCode(ADMIN_ROLE_CODE);
-        adminRole.setRoleName("System Administrator");
+        adminRole.setRoleName("超级管理员");
+        adminRole.setDescription("拥有系统全部管理和授权权限的内置角色");
+        adminRole.setEnabled(true);
         roleMapper.insert(adminRole);
         return adminRole;
     }

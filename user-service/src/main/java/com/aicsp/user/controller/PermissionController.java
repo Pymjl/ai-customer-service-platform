@@ -16,6 +16,11 @@ public class PermissionController {
 
     private final PermissionService permissionService;
 
+    /**
+     * 用途：查询权限字典列表。
+     *
+     * @return 权限列表，包含权限编码和权限名称
+     */
     @GetMapping
     public R<List<PermissionDTO>> listPermissions() {
         return R.ok(permissionService.listPermissions());

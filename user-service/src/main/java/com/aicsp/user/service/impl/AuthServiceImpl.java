@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class AuthServiceImpl implements AuthService {
+    private static final String SUPER_ADMIN_ROLE = "SUPER_ADMIN";
     private static final String ADMIN_ROLE = "ADMIN";
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
@@ -63,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
         if (user == null || user.getStatus() == null || user.getStatus() != 1 || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new IllegalArgumentException("账户名或密码错误");
         }
-        List<String> roles = roleMapper.selectByUserId(user.getUserId()).stream().map(Role::getRoleCode).toList();
+        List<String> roles = activeRoles(user.getUserId()).stream().map(Role::getRoleCode).toList();
         return issueToken(user, roles);
     }
 
@@ -75,7 +76,7 @@ public class AuthServiceImpl implements AuthService {
             refreshTokenService.revokeAll(userId);
             throw new IllegalArgumentException("invalid refresh token");
         }
-        List<String> roles = roleMapper.selectByUserId(user.getUserId()).stream().map(Role::getRoleCode).toList();
+        List<String> roles = activeRoles(user.getUserId()).stream().map(Role::getRoleCode).toList();
         return issueToken(user, roles);
     }
 
@@ -115,7 +116,7 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(1);
         userMapper.insert(user);
         Role role = roleMapper.selectByCode("USER");
-        if (role != null) {
+        if (role != null && Boolean.TRUE.equals(role.getEnabled())) {
             userRoleMapper.insert(DistributedIdUtils.nextId(), user.getUserId(), role.getId());
         }
     }
@@ -150,17 +151,24 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public boolean authorize(String authorization, String httpMethod, String path) {
         JwtTokenService.TokenClaims claims = parseHeader(authorization);
-        if (splitRoles(claims.roles()).contains(ADMIN_ROLE)) {
+        List<Role> activeRoles = activeRoles(claims.userId());
+        List<String> roles = activeRoles.stream().map(Role::getRoleCode).toList();
+        String normalizedPath = path == null ? "" : path.split("\\?")[0];
+        if (matchesDisabledResource(httpMethod, normalizedPath)) {
+            return false;
+        }
+        if (roles.contains(SUPER_ADMIN_ROLE)) {
             return true;
         }
-        List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(claims.userId());
+        List<Long> roleIds = activeRoles.stream().map(Role::getId).toList();
         if (roleIds.isEmpty()) {
             return false;
         }
-        String normalizedPath = path == null ? "" : path.split("\\?")[0];
         return apiResourceMapper.selectByRoleIds(roleIds).stream()
                 .filter(ApiResource::getEnabled)
-                .anyMatch(resource -> resource.getHttpMethod().equalsIgnoreCase(httpMethod) && matchPath(resource.getPath(), normalizedPath));
+                .anyMatch(resource -> resource.getHttpMethod().equalsIgnoreCase(httpMethod)
+                        && matchPath(resource.getPath(), normalizedPath)
+                        && matchesScope(resource, normalizedPath, claims.userId(), roles));
     }
 
     private JwtTokenService.TokenClaims parseHeader(String authorization) {
@@ -172,6 +180,10 @@ public class AuthServiceImpl implements AuthService {
 
     private List<String> splitRoles(String roles) {
         return roles == null || roles.isBlank() ? List.of() : List.of(roles.split(","));
+    }
+
+    private List<Role> activeRoles(String userId) {
+        return roleMapper.selectByUserId(userId);
     }
 
     private String normalizeUsername(String username) {
@@ -201,5 +213,27 @@ public class AuthServiceImpl implements AuthService {
         }
         String regex = pattern.replaceAll("\\{[^/]+}", "[^/]+");
         return path.matches(regex);
+    }
+
+    private boolean matchesDisabledResource(String httpMethod, String path) {
+        return apiResourceMapper.selectAll().stream()
+                .filter(resource -> !Boolean.TRUE.equals(resource.getEnabled()))
+                .anyMatch(resource -> resource.getHttpMethod().equalsIgnoreCase(httpMethod)
+                        && matchPath(resource.getPath(), path));
+    }
+
+    private boolean matchesScope(ApiResource resource, String path, String currentUserId, List<String> roles) {
+        if (roles.contains(ADMIN_ROLE)) {
+            return true;
+        }
+        if (!resource.getPath().startsWith("/api/users/{userId}")) {
+            return true;
+        }
+        String prefix = "/api/users/";
+        if (!path.startsWith(prefix)) {
+            return false;
+        }
+        String targetUserId = path.substring(prefix.length()).split("/")[0];
+        return currentUserId.equals(targetUserId);
     }
 }

@@ -9,4 +9,8 @@ public interface RoleService {
     List<RoleDTO> listRoles();
 
     void createRole(RoleCreateRequest request);
+
+    void updateRole(Long id, RoleCreateRequest request);
+
+    void deleteRole(Long id);
 }

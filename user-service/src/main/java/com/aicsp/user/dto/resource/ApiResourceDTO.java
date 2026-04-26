@@ -19,5 +19,7 @@ public class ApiResourceDTO {
     private String path;
     private String methodName;
     private String description;
+    private String requestExample;
+    private String responseExample;
     private Boolean enabled;
 }

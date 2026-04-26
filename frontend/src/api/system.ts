@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { PageResult, ResourceItem, RoleItem, UserItem } from '@/types/system'
+import type { PageResult, ResourceItem, ResourceTreeNode, RoleItem, UserItem } from '@/types/system'
 
 export interface QueryParams {
   keyword?: string
@@ -54,7 +54,7 @@ export function deleteRole(id: RoleItem['id']) {
 }
 
 export function fetchResources() {
-  return request.get<ResourceItem[], ResourceItem[]>('/resources/tree')
+  return request.get<ResourceTreeNode[], ResourceTreeNode[]>('/resources/tree')
 }
 
 export function createResource(data: Partial<ResourceItem>) {
@@ -82,9 +82,9 @@ export function saveUserRoles(userId: UserItem['userId'], roleIds: Array<RoleIte
 }
 
 export function fetchRoleResourceIds(roleId: RoleItem['id']) {
-  return request.get<Array<ResourceItem['id']>, Array<ResourceItem['id']>>(`/roles/${roleId}/resources`)
+  return request.get<Array<ResourceItem['id']>, Array<ResourceItem['id']>>(`/resources/roles/${roleId}`)
 }
 
 export function saveRoleResources(roleId: RoleItem['id'], resourceIds: Array<ResourceItem['id']>) {
-  return request.put<void, void>(`/roles/${roleId}/resources`, { resourceIds })
+  return request.put<void, void>(`/resources/roles/${roleId}`, { resourceIds })
 }

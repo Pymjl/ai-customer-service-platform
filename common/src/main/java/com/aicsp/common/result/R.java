@@ -9,23 +9,23 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class R<T> {
 
-    private Integer code;
+    private Boolean succeed;
     private String message;
     private T data;
 
     public static <T> R<T> ok(T data) {
-        return new R<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), data);
+        return new R<>(true, ResultCode.SUCCESS.getMessage(), data);
     }
 
     public static R<Void> ok() {
-        return new R<>(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), null);
+        return new R<>(true, ResultCode.SUCCESS.getMessage(), null);
     }
 
     public static <T> R<T> fail(ResultCode resultCode) {
-        return new R<>(resultCode.getCode(), resultCode.getMessage(), null);
+        return new R<>(false, resultCode.getMessage(), null);
     }
 
     public static <T> R<T> fail(Integer code, String message) {
-        return new R<>(code, message, null);
+        return new R<>(false, message, null);
     }
 }

@@ -13,4 +13,6 @@ public class RoleDTO {
     private Long id;
     private String roleCode;
     private String roleName;
+    private String description;
+    private Boolean enabled;
 }

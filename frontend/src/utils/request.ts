@@ -10,6 +10,7 @@ interface RetryRequestConfig extends InternalAxiosRequestConfig {
 }
 
 interface BackendResult<T> {
+  succeed?: boolean
   code?: number
   message?: string
   data?: T
@@ -35,10 +36,16 @@ let refreshPromise: Promise<string> | null = null
 
 function unwrapBackendResult<T>(response: AxiosResponse<BackendResult<T> | T>) {
   const result = response.data as BackendResult<T>
+  if (result && typeof result.succeed === 'boolean') {
+    if (!result.succeed) {
+      return Promise.reject(new Error(result.message || '请求处理失败'))
+    }
+    return result.data as T
+  }
   if (result && typeof result.code === 'number' && result.code !== 0 && result.code !== 200) {
     return Promise.reject(new Error(result.message || '请求处理失败'))
   }
-  return (result?.data ?? response.data) as T
+  return (Object.prototype.hasOwnProperty.call(result || {}, 'data') ? result.data : response.data) as T
 }
 
 function isAuthEntryRequest(url?: string) {
@@ -72,11 +79,18 @@ service.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 service.interceptors.response.use(
   (response) => {
     const result = response.data
+    if (result && typeof result.succeed === 'boolean') {
+      if (!result.succeed) {
+        ElMessage.error(result.message || '请求处理失败')
+        return Promise.reject(result)
+      }
+      return result.data
+    }
     if (result && typeof result.code === 'number' && result.code !== 0 && result.code !== 200) {
       ElMessage.error(result.message || '请求处理失败')
       return Promise.reject(result)
     }
-    return result?.data ?? result
+    return Object.prototype.hasOwnProperty.call(result || {}, 'data') ? result.data : result
   },
   async (error: AxiosError<{ message?: string }>) => {
     const config = error.config as RetryRequestConfig | undefined

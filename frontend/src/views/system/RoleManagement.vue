@@ -14,11 +14,15 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </div>
       <el-table v-loading="loading" :data="roles" stripe>
-        <el-table-column prop="code" label="角色编码" min-width="160" />
-        <el-table-column prop="name" label="角色名称" min-width="160" />
+        <el-table-column label="角色编码" min-width="160">
+          <template #default="{ row }">{{ roleCode(row) || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="角色名称" min-width="160">
+          <template #default="{ row }">{{ roleName(row) || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" min-width="260" />
         <el-table-column label="状态" width="110">
-          <template #default="{ row }"><el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag></template>
+          <template #default="{ row }"><el-tag :type="isRoleEnabled(row) ? 'success' : 'info'">{{ isRoleEnabled(row) ? '启用' : '停用' }}</el-tag></template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
@@ -79,13 +83,33 @@ async function loadData() {
 
 function resetQuery() { query.keyword = ''; query.current = 1; loadData() }
 function openCreate() { editingId.value = null; Object.assign(form, { code: '', name: '', description: '', enabled: true }); dialogVisible.value = true }
-function openEdit(row: RoleItem) { editingId.value = row.id; Object.assign(form, row); dialogVisible.value = true }
+function roleCode(role: RoleItem) {
+  return role.code || role.roleCode || ''
+}
+
+function roleName(role: RoleItem) {
+  return role.name || role.roleName || roleCode(role)
+}
+
+function isRoleEnabled(role: RoleItem) {
+  return role.enabled !== false
+}
+
+function toRolePayload() {
+  return { roleCode: form.code, roleName: form.name, description: form.description, enabled: form.enabled }
+}
+
+function openEdit(row: RoleItem) {
+  editingId.value = row.id
+  Object.assign(form, { code: roleCode(row), name: roleName(row), description: row.description || '', enabled: isRoleEnabled(row) })
+  dialogVisible.value = true
+}
 
 async function handleSave() {
   await formRef.value?.validate()
   saving.value = true
   try {
-    editingId.value ? await updateRole(editingId.value, form) : await createRole(form)
+    editingId.value ? await updateRole(editingId.value, toRolePayload()) : await createRole(toRolePayload())
     ElMessage.success('保存成功')
     dialogVisible.value = false
     loadData()
@@ -93,7 +117,7 @@ async function handleSave() {
 }
 
 async function handleDelete(row: RoleItem) {
-  await ElMessageBox.confirm(`确认删除角色 ${row.name}？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确认删除角色 ${roleName(row)}？`, '提示', { type: 'warning' })
   await deleteRole(row.id)
   ElMessage.success('删除成功')
   loadData()

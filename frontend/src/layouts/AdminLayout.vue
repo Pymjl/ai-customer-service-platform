@@ -8,7 +8,7 @@
           <span>Customer Service</span>
         </div>
       </button>
-      <el-menu :default-active="activeMenu" background-color="transparent" text-color="#cbd5e1" active-text-color="#fff" @select="handleMenuSelect">
+      <el-menu :default-active="activeMenu" router background-color="transparent" text-color="#cbd5e1" active-text-color="#fff">
         <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.title }}</span>
@@ -44,7 +44,9 @@
         </div>
       </el-header>
       <el-main class="content">
-        <RouterView />
+        <RouterView v-slot="{ Component, route: viewRoute }">
+          <component :is="Component" :key="viewRoute.fullPath" />
+        </RouterView>
       </el-main>
     </el-container>
   </el-container>
@@ -61,6 +63,7 @@ interface MenuItem {
   title: string
   icon: string
   adminOnly?: boolean
+  superAdminOnly?: boolean
 }
 
 const route = useRoute()
@@ -73,18 +76,29 @@ const allMenuItems: MenuItem[] = [
   { path: '/users', title: '用户管理', icon: 'User', adminOnly: true },
   { path: '/roles', title: '角色管理', icon: 'Avatar', adminOnly: true },
   { path: '/resources', title: '资源管理', icon: 'Menu', adminOnly: true },
-  { path: '/user-roles', title: '用户角色授权', icon: 'Connection', adminOnly: true },
-  { path: '/role-resources', title: '角色资源授权', icon: 'Lock', adminOnly: true }
+  { path: '/user-roles', title: '用户角色授权', icon: 'Connection', adminOnly: true, superAdminOnly: true },
+  { path: '/role-resources', title: '角色资源授权', icon: 'Lock', adminOnly: true, superAdminOnly: true }
 ]
 
 const adminRoleCodes = new Set(['ADMIN', 'ROLE_ADMIN', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN', '管理员', '超级管理员'])
+const superAdminRoleCodes = new Set(['SUPER_ADMIN', 'ROLE_SUPER_ADMIN', '超级管理员'])
 
 const isAdmin = computed(() => {
   return authStore.user?.roles?.some((role) => adminRoleCodes.has(role.toUpperCase()) || adminRoleCodes.has(role)) ?? false
 })
 
-const menuItems = computed(() => allMenuItems.filter((item) => !item.adminOnly || isAdmin.value))
-const activeMenu = computed(() => (route.path === '/profile' ? '' : route.path))
+const isSuperAdmin = computed(() => {
+  return authStore.user?.roles?.some((role) => superAdminRoleCodes.has(role.toUpperCase()) || superAdminRoleCodes.has(role)) ?? false
+})
+
+const menuItems = computed(() => allMenuItems.filter((item) => {
+  if (item.superAdminOnly) return isSuperAdmin.value
+  return !item.adminOnly || isAdmin.value
+}))
+const activeMenu = computed(() => {
+  if (route.path === '/profile') return ''
+  return allMenuItems.find((item) => route.path === item.path || route.path.startsWith(`${item.path}/`))?.path || ''
+})
 const currentTitle = computed(() => {
   if (route.path === '/profile') return '个人信息'
   return allMenuItems.find((item) => route.path.startsWith(item.path))?.title || '智能客服'
@@ -95,12 +109,6 @@ const roleLabel = computed(() => authStore.user?.roles?.join(' / ') || '普通�
 
 function goChat() {
   router.push('/chat')
-}
-
-function handleMenuSelect(path: string) {
-  if (path !== route.path) {
-    router.push(path)
-  }
 }
 
 function toggleSidebar() {
