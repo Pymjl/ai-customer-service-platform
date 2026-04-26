@@ -22,7 +22,7 @@
       <el-header class="topbar">
         <div>
           <h2>{{ currentTitle }}</h2>
-          <p><span class="status-dot" />前端工作台已就绪，智能客服接口待接入</p>
+          <p><span class="status-dot" />智能客服与知识库管理已接入业务服务</p>
         </div>
         <div class="topbar-actions">
           <el-dropdown @command="handleCommand">
@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import defaultAvatar from '@/assets/default-avatar.webp'
 
@@ -73,6 +74,7 @@ const sidebarCollapsed = ref(false)
 
 const allMenuItems: MenuItem[] = [
   { path: '/chat', title: '智能客服', icon: 'Service' },
+  { path: '/knowledge', title: '知识库', icon: 'Collection' },
   { path: '/users', title: '用户管理', icon: 'User', adminOnly: true },
   { path: '/roles', title: '角色管理', icon: 'Avatar', adminOnly: true },
   { path: '/resources', title: '资源管理', icon: 'Menu', adminOnly: true },
@@ -249,6 +251,15 @@ async function handleCommand(command: string) {
   margin: 6px 0 0;
   color: #64748b;
   font-size: 13px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #22c55e;
 }
 
 .topbar-actions,

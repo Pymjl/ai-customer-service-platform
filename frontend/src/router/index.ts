@@ -37,6 +37,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '智能客服', icon: 'Service' }
       },
       {
+        path: 'knowledge',
+        name: 'KnowledgeBase',
+        component: () => import('@/views/KnowledgeBaseView.vue'),
+        meta: { title: '知识库', icon: 'Collection' }
+      },
+      {
         path: 'users',
         name: 'UserManagement',
         component: () => import('@/views/system/UserManagement.vue'),
