@@ -3,7 +3,7 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="application"/>
-    <springProperty scope="context" name="LOG_HOME" source="logging.file.path" defaultValue="user-service/logs"/>
+    <springProperty scope="context" name="LOG_HOME" source="logging.file.path" defaultValue="logs"/>
     <property name="CONSOLE_PATTERN" value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){magenta} %highlight(%-5level) %clr([%X{traceId:-}]){cyan} %clr(%logger{36}){blue} %clr(-){faint} %msg%n%wEx"/>
     <property name="FILE_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] %logger{64} - %msg%n%wEx"/>
 

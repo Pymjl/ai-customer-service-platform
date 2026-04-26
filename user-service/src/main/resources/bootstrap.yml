@@ -1,0 +1,47 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  application:
+    name: user-service
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_PASSWORD:nacos}
+      discovery:
+        server-addr: ${spring.cloud.nacos.server-addr}
+        namespace: ${NACOS_NAMESPACE:af127353-dea2-4140-90cd-01cfbe3ceff3}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+      config:
+        server-addr: ${spring.cloud.nacos.server-addr}
+        namespace: ${NACOS_NAMESPACE:af127353-dea2-4140-90cd-01cfbe3ceff3}
+        username: ${spring.cloud.nacos.username}
+        password: ${spring.cloud.nacos.password}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        file-extension: yaml
+        refresh-enabled: true
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+    import: optional:nacos:user-service-dev.yaml?group=${NACOS_GROUP:DEFAULT_GROUP}&refreshEnabled=true&preference=remote
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+    import: optional:nacos:user-service-prod.yaml?group=${NACOS_GROUP:DEFAULT_GROUP}&refreshEnabled=true&preference=remote
+  cloud:
+    nacos:
+      discovery:
+        namespace: ${NACOS_NAMESPACE:b1c9f61b-2b9f-4e58-9c61-6c25af1e7f9b}
+      config:
+        namespace: ${NACOS_NAMESPACE:b1c9f61b-2b9f-4e58-9c61-6c25af1e7f9b}
+---
+spring:
+  config:
+    activate:
+      on-profile: debug
+    import: optional:nacos:user-service-debug.yaml?group=${NACOS_GROUP:DEFAULT_GROUP}&refreshEnabled=true&preference=remote
