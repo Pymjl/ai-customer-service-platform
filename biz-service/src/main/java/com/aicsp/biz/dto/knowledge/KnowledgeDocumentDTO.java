@@ -8,6 +8,10 @@ import lombok.Data;
 public class KnowledgeDocumentDTO {
 
     private String documentId;
+    private String kbId;
+    private Integer kbVersion;
+    private String kbName;
+    private String kbType;
     private String scope;
     private String title;
     private String sourceType;

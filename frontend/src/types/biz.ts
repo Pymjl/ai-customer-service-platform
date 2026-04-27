@@ -39,6 +39,10 @@ export interface MessageDTO {
 export interface KnowledgeDocument {
   id?: number | string
   documentId?: number | string
+  kbId?: string
+  kbVersion?: number
+  kbName?: string
+  kbType?: string
   title: string
   filename?: string
   originalFilename?: string
@@ -60,6 +64,70 @@ export interface KnowledgeDocument {
   previewText?: string
   createdAt?: string
   updatedAt?: string
+}
+
+export interface KnowledgeBase {
+  kbId: string
+  scope: 'PUBLIC' | 'PERSONAL' | string
+  name: string
+  description?: string
+  kbType: 'CASE_LIBRARY' | 'GENERIC_PUBLIC' | 'PERSONAL' | string
+  currentVersion?: number
+  enabled?: boolean
+  status?: string
+  locked?: boolean
+  documentCount?: number
+  manageable?: boolean
+  hasPublicSnapshot?: boolean
+  publicSnapshotKbId?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface KnowledgeBaseQuery {
+  pageNo: number
+  pageSize: number
+  keyword?: string
+}
+
+export interface KnowledgeBasePayload {
+  scope: 'PUBLIC' | 'PERSONAL' | string
+  name: string
+  description?: string
+  kbType?: string
+  enabled?: boolean
+}
+
+export interface ContributionApplication {
+  applicationId: string
+  applicationType?: string
+  sourceKbId?: string
+  targetKbId?: string
+  sourceSnapshotId?: string
+  status?: string
+  reason?: string
+  reviewComment?: string
+  createdAt?: string
+  reviewedAt?: string
+}
+
+export interface ContributionDiff {
+  applicationId: string
+  sourceSnapshotId?: string
+  targetKbId?: string
+  targetVersionNo?: number
+  added?: ContributionDiffItem[]
+  modified?: ContributionDiffItem[]
+  deleted?: ContributionDiffItem[]
+}
+
+export interface ContributionDiffItem {
+  sourceDocumentId?: string
+  targetDocumentId?: string
+  title?: string
+  sourceType?: string
+  fingerprint?: string
+  previousFingerprint?: string
 }
 
 export interface KnowledgeDocumentQuery {
@@ -111,6 +179,12 @@ export interface KnowledgeTag {
 }
 
 export interface KnowledgeSelectable {
+  publicKbs?: KnowledgeBase[]
+  personalKbs?: KnowledgeBase[]
+  policy?: {
+    publicAlwaysOn?: boolean
+    personalSelectable?: boolean
+  }
   categories?: KnowledgeCategory[]
   tags?: KnowledgeTag[]
   productLines?: string[]
@@ -126,15 +200,11 @@ export interface IngestionStatus {
   updatedAt?: string
 }
 
-export type KnowledgeSelectionMode = 'DEFAULT' | 'PUBLIC_ONLY' | 'PERSONAL_ONLY' | 'SELECTED' | 'DISABLED'
+export type KnowledgeSelectionMode = 'DEFAULT' | 'PUBLIC_ONLY' | 'PERSONAL_ONLY' | 'NONE'
 
 export interface KnowledgeSelection {
   mode: KnowledgeSelectionMode
-  includePublic: boolean
-  includePersonal: boolean
-  documentIds: Array<number | string>
-  categoryIds: Array<number | string>
-  tagIds: Array<number | string>
+  personalKbIds: string[]
 }
 
 export interface ChatStreamPayload {
@@ -146,8 +216,10 @@ export interface ChatStreamPayload {
 
 export interface ChatStreamHandlers {
   onMessage: (chunk: string) => void
+  onCitation?: (citation: Record<string, unknown>) => void
   onDone?: () => void
   onError?: (message: string) => void
 }
 
 export type KnowledgePageResult = PageResult<KnowledgeDocument>
+export type KnowledgeBasePageResult = PageResult<KnowledgeBase>

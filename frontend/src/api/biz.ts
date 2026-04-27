@@ -3,7 +3,13 @@ import type { AxiosRequestConfig } from 'axios'
 import type {
   ChatStreamHandlers,
   ChatStreamPayload,
+  ContributionApplication,
+  ContributionDiff,
   IngestionStatus,
+  KnowledgeBase,
+  KnowledgeBasePageResult,
+  KnowledgeBasePayload,
+  KnowledgeBaseQuery,
   KnowledgeCategory,
   KnowledgeDocument,
   KnowledgeDocumentQuery,
@@ -62,6 +68,93 @@ export function fetchKnowledgeDocuments(scope: KnowledgeScope, params: Knowledge
       { ...silentRequestConfig, params: cleanParams(params as unknown as Record<string, unknown>) }
     )
     .then(normalizePage<KnowledgeDocument>)
+}
+
+export function fetchKnowledgeBases(scope: 'PUBLIC' | 'PERSONAL' | string, params: KnowledgeBaseQuery) {
+  return request
+    .get<KnowledgeBasePageResult | KnowledgeBase[], KnowledgeBasePageResult | KnowledgeBase[]>('/knowledge/kbs', {
+      ...silentRequestConfig,
+      params: cleanParams({ ...params, scope })
+    })
+    .then(normalizePage<KnowledgeBase>)
+}
+
+export function createKnowledgeBase(data: KnowledgeBasePayload) {
+  return request.post<KnowledgeBase, KnowledgeBase>('/knowledge/kbs', data)
+}
+
+export function updateKnowledgeBase(kbId: string, data: Partial<KnowledgeBasePayload>) {
+  return request.put<KnowledgeBase, KnowledgeBase>(`/knowledge/kbs/${kbId}`, data)
+}
+
+export function deleteKnowledgeBase(kbId: string) {
+  return request.delete<void, void>(`/knowledge/kbs/${kbId}`)
+}
+
+export function enableKnowledgeBase(kbId: string) {
+  return request.post<void, void>(`/knowledge/kbs/${kbId}/enable`)
+}
+
+export function disableKnowledgeBase(kbId: string) {
+  return request.post<void, void>(`/knowledge/kbs/${kbId}/disable`)
+}
+
+export function fetchKnowledgeBaseDocuments(kbId: string, params: KnowledgeDocumentQuery) {
+  return request
+    .get<KnowledgePageResult | KnowledgeDocument[], KnowledgePageResult | KnowledgeDocument[]>(
+      `/knowledge/kbs/${kbId}/documents`,
+      { ...silentRequestConfig, params: cleanParams(params as unknown as Record<string, unknown>) }
+    )
+    .then(normalizePage<KnowledgeDocument>)
+}
+
+export function uploadKnowledgeBaseDocument(kbId: string, payload: KnowledgeUploadPayload) {
+  const formData = new FormData()
+  formData.append('file', payload.file)
+  formData.append('title', payload.title)
+  formData.append('sourceType', payload.sourceType)
+  if (payload.categoryId !== undefined && payload.categoryId !== '') {
+    formData.append('categoryId', String(payload.categoryId))
+  }
+  if (payload.productLine) formData.append('productLine', payload.productLine)
+  if (payload.tags) formData.append('tags', payload.tags)
+  return request.post<KnowledgeDocument, KnowledgeDocument>(`/knowledge/kbs/${kbId}/documents`, formData)
+}
+
+export function reindexKnowledgeBaseDocument(kbId: string, documentId: string | number) {
+  return request.post<void, void>(`/knowledge/kbs/${kbId}/documents/${documentId}/reindex`)
+}
+
+export function contributeKnowledgeBase(kbId: string, reason?: string) {
+  return request.post('/knowledge/kbs/' + kbId + '/contribute', { reason }, silentRequestConfig)
+}
+
+export function fetchMyContributions() {
+  return request.get<ContributionApplication[], ContributionApplication[]>('/knowledge/contributions/mine', silentRequestConfig)
+}
+
+export function fetchPendingContributions() {
+  return request.get<ContributionApplication[], ContributionApplication[]>('/knowledge/contributions/pending', silentRequestConfig)
+}
+
+export function fetchContributionDiff(applicationId: string) {
+  return request.get<ContributionDiff, ContributionDiff>(`/knowledge/contributions/${applicationId}/diff`, silentRequestConfig)
+}
+
+export function approveContribution(applicationId: string, comment?: string, activateVersion = false) {
+  return request.post<ContributionApplication, ContributionApplication>(
+    `/knowledge/contributions/${applicationId}/approve`,
+    { comment, activateVersion },
+    silentRequestConfig
+  )
+}
+
+export function rejectContribution(applicationId: string, comment: string) {
+  return request.post<ContributionApplication, ContributionApplication>(
+    `/knowledge/contributions/${applicationId}/reject`,
+    { comment },
+    silentRequestConfig
+  )
 }
 
 export function fetchAllKnowledgeDocuments(params: KnowledgeDocumentQuery) {
@@ -187,6 +280,14 @@ export async function postChatStream(payload: ChatStreamPayload, token: string, 
       handlers.onDone?.()
       return
     }
+    if (event === 'citation') {
+      try {
+        handlers.onCitation?.(JSON.parse(data))
+      } catch {
+        handlers.onCitation?.({ raw: data })
+      }
+      return
+    }
     if (event === 'error') {
       handlers.onError?.(parseStreamError(data))
       return
@@ -231,21 +332,12 @@ function parseStreamError(data: string) {
 function toStreamPayload(payload: ChatStreamPayload) {
   if (!payload.knowledgeSelection) return payload
   const selection = payload.knowledgeSelection
-  const mode = selection.mode === 'DISABLED'
-    ? 'NONE'
-    : selection.mode === 'DEFAULT'
-      ? 'DEFAULT'
-      : 'SELECTED'
   return {
     ...payload,
     locale: 'zh-CN',
     knowledgeSelection: {
-      mode,
-      includePublic: selection.includePublic,
-      includePersonal: selection.includePersonal,
-      documentIds: selection.documentIds.map(String),
-      categoryIds: selection.categoryIds.map(String),
-      tagIds: selection.tagIds.map(String)
+      mode: selection.mode,
+      personalKbIds: selection.personalKbIds.map(String)
     }
   }
 }

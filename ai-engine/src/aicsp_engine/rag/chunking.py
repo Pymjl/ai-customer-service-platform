@@ -37,6 +37,9 @@ class ChunkDocument:
     document_id: str
     title: str
     text: str
+    kb_id: str = "kb_default"
+    kb_version: int = 1
+    kb_type: str = "GENERIC_PUBLIC"
     tenant_id: str = "default"
     scope: str = "PUBLIC"
     owner_user_id: str | None = None
@@ -47,6 +50,7 @@ class ChunkDocument:
     status: str = "READY"
     enabled: bool = True
     language: str = "zh-CN"
+    kb_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -54,6 +58,9 @@ class Chunk:
     chunk_id: str
     parent_chunk_id: str | None
     document_id: str
+    kb_id: str
+    kb_version: int
+    kb_type: str
     content: str
     chunk_type: str
     source_type: str
@@ -75,6 +82,9 @@ class Chunk:
             "chunk_id": self.chunk_id,
             "parent_chunk_id": self.parent_chunk_id,
             "document_id": self.document_id,
+            "kb_id": self.kb_id,
+            "kb_version": self.kb_version,
+            "kb_type": self.kb_type,
             "chunk_type": self.chunk_type,
             "source_type": self.source_type,
             "tenant_id": self.tenant_id,
@@ -647,10 +657,15 @@ def _make_chunk(
 ) -> Chunk:
     now = datetime.now(timezone.utc).isoformat()
     token_count = approximate_token_count(content)
+    final_chunk_id = _versioned_id(document, chunk_id)
     base_metadata = {
-        "chunk_id": chunk_id,
+        "chunk_id": final_chunk_id,
         "parent_chunk_id": parent_chunk_id,
         "document_id": document.document_id,
+        "kb_id": document.kb_id,
+        "kb_name": document.kb_name,
+        "kb_version": document.kb_version,
+        "kb_type": document.kb_type,
         "tenant_id": document.tenant_id,
         "scope": document.scope,
         "owner_user_id": document.owner_user_id,
@@ -659,6 +674,7 @@ def _make_chunk(
         "chunk_type": chunk_type,
         "source_type": source_type,
         "title": document.title,
+        "document_title": document.title,
         "section_path": section_path,
         "content_hash": _content_hash(content),
         "quality_score": quality_score,
@@ -672,9 +688,12 @@ def _make_chunk(
     }
     base_metadata.update(metadata)
     return Chunk(
-        chunk_id=chunk_id,
+        chunk_id=final_chunk_id,
         parent_chunk_id=parent_chunk_id,
         document_id=document.document_id,
+        kb_id=document.kb_id,
+        kb_version=document.kb_version,
+        kb_type=document.kb_type,
         content=content,
         chunk_type=chunk_type,
         source_type=source_type,
@@ -695,6 +714,11 @@ def _make_chunk(
 
 def _stable_id(document_id: str, case_id: str, chunk_type: str, section_path: list[str], ordinal: int) -> str:
     raw = "|".join([document_id, case_id, chunk_type, "/".join(section_path), str(ordinal)])
+    return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:48]
+
+
+def _versioned_id(document: ChunkDocument, stable_id: str) -> str:
+    raw = f"{document.kb_id}|{document.kb_version}|{stable_id}"
     return "sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:48]
 
 

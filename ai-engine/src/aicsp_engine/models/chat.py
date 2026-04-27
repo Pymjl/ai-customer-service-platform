@@ -3,13 +3,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-KnowledgeSelectionMode = Literal["DEFAULT", "SELECTED", "NONE"]
+KnowledgeSelectionMode = Literal["DEFAULT", "PUBLIC_ONLY", "PERSONAL_ONLY", "SELECTED", "NONE"]
 
 
 class KnowledgeSelection(BaseModel):
     mode: KnowledgeSelectionMode = "DEFAULT"
     includePublic: bool | None = None
     includePersonal: bool | None = None
+    personalKbIds: list[str] = Field(default_factory=list)
+    kbIds: list[str] = Field(default_factory=list)
     documentIds: list[str] = Field(default_factory=list)
     categoryIds: list[str] = Field(default_factory=list)
     tagIds: list[str] = Field(default_factory=list)

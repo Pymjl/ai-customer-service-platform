@@ -9,11 +9,19 @@ class EngineEvent(BaseModel):
     data: str
 
     @classmethod
-    def done(cls, finish_reason: str = "stop", trace_id: str | None = None) -> "EngineEvent":
+    def done(
+        cls,
+        finish_reason: str = "stop",
+        trace_id: str | None = None,
+        rag: dict[str, Any] | None = None,
+    ) -> "EngineEvent":
+        payload: dict[str, Any] = {"finishReason": finish_reason, "traceId": trace_id}
+        if rag is not None:
+            payload["rag"] = rag
         return cls(
             event="done",
             data=json.dumps(
-                {"finishReason": finish_reason, "traceId": trace_id},
+                payload,
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),

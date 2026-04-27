@@ -8,6 +8,8 @@ public class KnowledgeIngestionTask {
 
     private String taskId;
     private String documentId;
+    private String kbId;
+    private Integer kbVersion;
     private String taskType;
     private String status;
     private Integer progress;

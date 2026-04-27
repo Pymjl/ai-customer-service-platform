@@ -12,6 +12,7 @@ public class RetrievalFilterResponse {
     private String mode;
     private Boolean skipRetrieval;
     private String tenantId;
+    private List<String> allowedKbIds;
     private List<String> allowedScopes;
     private Map<String, Object> filters;
     private List<DeniedCandidate> deniedCandidates;
@@ -19,6 +20,7 @@ public class RetrievalFilterResponse {
     @Data
     @Builder
     public static class DeniedCandidate {
+        private String kbIdHash;
         private String documentIdHash;
         private String scope;
         private String reason;

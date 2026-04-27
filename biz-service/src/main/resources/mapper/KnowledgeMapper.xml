@@ -2,15 +2,56 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.aicsp.biz.mapper.KnowledgeMapper">
+    <resultMap id="KnowledgeBaseMap" type="com.aicsp.biz.entity.KnowledgeBase">
+        <id column="id" property="id"/>
+        <result column="kb_id" property="kbId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="scope" property="scope"/>
+        <result column="owner_user_id" property="ownerUserId"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="kb_type" property="kbType"/>
+        <result column="source_kb_id" property="sourceKbId"/>
+        <result column="source_version" property="sourceVersion"/>
+        <result column="current_version" property="currentVersion"/>
+        <result column="enabled" property="enabled"/>
+        <result column="status" property="status"/>
+        <result column="locked" property="locked"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_by" property="updatedBy"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+        <result column="document_count" property="documentCount"/>
+    </resultMap>
+
+    <resultMap id="VersionMap" type="com.aicsp.biz.entity.KnowledgeVersion">
+        <id column="id" property="id"/>
+        <result column="version_id" property="versionId"/>
+        <result column="kb_id" property="kbId"/>
+        <result column="version_no" property="versionNo"/>
+        <result column="version_type" property="versionType"/>
+        <result column="source_kb_id" property="sourceKbId"/>
+        <result column="source_version_no" property="sourceVersionNo"/>
+        <result column="note" property="note"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
     <resultMap id="DocumentMap" type="com.aicsp.biz.entity.KnowledgeDocument">
         <id column="id" property="id"/>
         <result column="document_id" property="documentId"/>
+        <result column="kb_id" property="kbId"/>
+        <result column="kb_version" property="kbVersion"/>
         <result column="tenant_id" property="tenantId"/>
         <result column="scope" property="scope"/>
         <result column="owner_user_id" property="ownerUserId"/>
         <result column="title" property="title"/>
         <result column="source_type" property="sourceType"/>
         <result column="object_path" property="objectPath"/>
+        <result column="source_document_id" property="sourceDocumentId"/>
+        <result column="source_snapshot_id" property="sourceSnapshotId"/>
         <result column="category_id" property="categoryId"/>
         <result column="product_line" property="productLine"/>
         <result column="status" property="status"/>
@@ -49,6 +90,8 @@
     <resultMap id="TaskMap" type="com.aicsp.biz.entity.KnowledgeIngestionTask">
         <id column="task_id" property="taskId"/>
         <result column="document_id" property="documentId"/>
+        <result column="kb_id" property="kbId"/>
+        <result column="kb_version" property="kbVersion"/>
         <result column="task_type" property="taskType"/>
         <result column="status" property="status"/>
         <result column="progress" property="progress"/>
@@ -60,10 +103,338 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
+    <resultMap id="ContributionApplicationMap" type="com.aicsp.biz.entity.KnowledgeContributionApplication">
+        <id column="id" property="id"/>
+        <result column="application_id" property="applicationId"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="application_type" property="applicationType"/>
+        <result column="source_document_id" property="sourceDocumentId"/>
+        <result column="source_kb_id" property="sourceKbId"/>
+        <result column="source_snapshot_id" property="sourceSnapshotId"/>
+        <result column="target_kb_id" property="targetKbId"/>
+        <result column="target_version_no" property="targetVersionNo"/>
+        <result column="applicant_user_id" property="applicantUserId"/>
+        <result column="status" property="status"/>
+        <result column="target_category_id" property="targetCategoryId"/>
+        <result column="reason" property="reason"/>
+        <result column="reject_reason" property="rejectReason"/>
+        <result column="review_comment" property="reviewComment"/>
+        <result column="reviewer_user_id" property="reviewerUserId"/>
+        <result column="reviewed_at" property="reviewedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <resultMap id="SnapshotDocumentMap" type="com.aicsp.biz.entity.KnowledgeSnapshotDocument">
+        <id column="id" property="id"/>
+        <result column="snapshot_id" property="snapshotId"/>
+        <result column="source_kb_id" property="sourceKbId"/>
+        <result column="source_version" property="sourceVersion"/>
+        <result column="source_document_id" property="sourceDocumentId"/>
+        <result column="title" property="title"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="object_path" property="objectPath"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="product_line" property="productLine"/>
+        <result column="enabled" property="enabled"/>
+        <result column="status" property="status"/>
+        <result column="fingerprint" property="fingerprint"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
     <sql id="DocumentColumns">
-        id, document_id, tenant_id, scope, owner_user_id, title, source_type, object_path, category_id,
+        id, document_id, kb_id, kb_version, tenant_id, scope, owner_user_id, title, source_type, object_path,
+        source_document_id, source_snapshot_id, category_id,
         product_line, status, enabled, created_by, created_at, updated_by, updated_at, deleted
     </sql>
+
+    <sql id="KnowledgeBaseColumns">
+        kb.id, kb.kb_id, kb.tenant_id, kb.scope, kb.owner_user_id, kb.name, kb.description, kb.kb_type,
+        kb.source_kb_id, kb.source_version, kb.current_version, kb.enabled, kb.status, kb.locked,
+        kb.created_by, kb.created_at, kb.updated_by, kb.updated_at, kb.deleted,
+        COALESCE(COUNT(d.document_id), 0) AS document_count
+    </sql>
+
+    <sql id="KnowledgeBaseWhere">
+        kb.deleted = FALSE
+        AND kb.tenant_id = #{tenantId}
+        AND kb.scope = #{scope}
+        <if test="ownerUserId != null and ownerUserId != ''">
+            AND kb.owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+            AND kb.owner_user_id IS NULL
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (kb.name ILIKE CONCAT('%', #{keyword}, '%') OR kb.description ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="includeDisabled == false">
+            AND kb.enabled = TRUE
+            AND kb.status = 'ACTIVE'
+        </if>
+    </sql>
+
+    <select id="listKnowledgeBases" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="KnowledgeBaseColumns"/>
+        FROM kb_knowledge_base kb
+        LEFT JOIN kb_document d ON d.kb_id = kb.kb_id AND d.deleted = FALSE
+        WHERE <include refid="KnowledgeBaseWhere"/>
+        GROUP BY kb.id
+        ORDER BY kb.updated_at DESC, kb.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countKnowledgeBases" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_knowledge_base kb
+        WHERE <include refid="KnowledgeBaseWhere"/>
+    </select>
+
+    <select id="findKnowledgeBase" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="KnowledgeBaseColumns"/>
+        FROM kb_knowledge_base kb
+        LEFT JOIN kb_document d ON d.kb_id = kb.kb_id AND d.deleted = FALSE
+        WHERE kb.kb_id = #{kbId}
+          AND kb.deleted = FALSE
+        GROUP BY kb.id
+        LIMIT 1
+    </select>
+
+    <select id="findCaseLibrary" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="KnowledgeBaseColumns"/>
+        FROM kb_knowledge_base kb
+        LEFT JOIN kb_document d ON d.kb_id = kb.kb_id AND d.deleted = FALSE
+        WHERE kb.tenant_id = #{tenantId}
+          AND kb.kb_type = 'CASE_LIBRARY'
+          AND kb.deleted = FALSE
+        GROUP BY kb.id
+        LIMIT 1
+    </select>
+
+    <select id="findDefaultKnowledgeBase" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="KnowledgeBaseColumns"/>
+        FROM kb_knowledge_base kb
+        LEFT JOIN kb_document d ON d.kb_id = kb.kb_id AND d.deleted = FALSE
+        WHERE kb.tenant_id = #{tenantId}
+          AND kb.scope = #{scope}
+          AND kb.deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND kb.owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+          AND kb.owner_user_id IS NULL
+        </if>
+        GROUP BY kb.id
+        ORDER BY CASE WHEN kb.kb_type = 'CASE_LIBRARY' THEN 0 ELSE 1 END, kb.created_at ASC
+        LIMIT 1
+    </select>
+
+    <insert id="insertKnowledgeBase" parameterType="com.aicsp.biz.entity.KnowledgeBase">
+        INSERT INTO kb_knowledge_base (
+            id, kb_id, tenant_id, scope, owner_user_id, name, description, kb_type, source_kb_id,
+            source_version, current_version, enabled, status, locked, created_by, updated_by, deleted
+        )
+        VALUES (
+            #{id}, #{kbId}, #{tenantId}, #{scope}, #{ownerUserId}, #{name}, #{description}, #{kbType}, #{sourceKbId},
+            #{sourceVersion}, #{currentVersion}, #{enabled}, #{status}, #{locked}, #{createdBy}, #{updatedBy}, FALSE
+        )
+    </insert>
+
+    <update id="updateKnowledgeBase" parameterType="com.aicsp.biz.entity.KnowledgeBase">
+        UPDATE kb_knowledge_base
+        SET name = #{name},
+            description = #{description},
+            locked = #{locked},
+            status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE kb_id = #{kbId}
+          AND deleted = FALSE
+    </update>
+
+    <update id="updateKnowledgeBaseEnabled">
+        UPDATE kb_knowledge_base
+        SET enabled = #{enabled},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE kb_id = #{kbId}
+          AND deleted = FALSE
+    </update>
+
+    <update id="updateKnowledgeBaseCurrentVersion">
+        UPDATE kb_knowledge_base
+        SET current_version = #{versionNo},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE kb_id = #{kbId}
+          AND deleted = FALSE
+    </update>
+
+    <update id="softDeleteKnowledgeBase">
+        UPDATE kb_knowledge_base
+        SET deleted = TRUE,
+            status = 'DELETED',
+            enabled = FALSE,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE kb_id = #{kbId}
+          AND deleted = FALSE
+    </update>
+
+    <insert id="insertKnowledgeVersion" parameterType="com.aicsp.biz.entity.KnowledgeVersion">
+        INSERT INTO kb_version (
+            id, version_id, kb_id, version_no, version_type, source_kb_id, source_version_no, note, created_by, deleted
+        )
+        VALUES (
+            #{id}, #{versionId}, #{kbId}, #{versionNo}, #{versionType}, #{sourceKbId}, #{sourceVersionNo}, #{note}, #{createdBy}, FALSE
+        )
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <select id="listKnowledgeVersions" resultMap="VersionMap">
+        SELECT id, version_id, kb_id, version_no, version_type, source_kb_id, source_version_no,
+               note, created_by, created_at, deleted
+        FROM kb_version
+        WHERE kb_id = #{kbId}
+          AND deleted = FALSE
+        ORDER BY version_no DESC
+    </select>
+
+    <select id="listSelectableKbs" resultMap="KnowledgeBaseMap">
+        SELECT <include refid="KnowledgeBaseColumns"/>
+        FROM kb_knowledge_base kb
+        LEFT JOIN kb_document d ON d.kb_id = kb.kb_id AND d.deleted = FALSE
+        WHERE kb.tenant_id = #{tenantId}
+          AND kb.scope = #{scope}
+          AND kb.enabled = TRUE
+          AND kb.status = 'ACTIVE'
+          AND kb.deleted = FALSE
+        <if test="ownerUserId != null and ownerUserId != ''">
+          AND kb.owner_user_id = #{ownerUserId}
+        </if>
+        <if test="scope == 'PUBLIC'">
+          AND kb.owner_user_id IS NULL
+        </if>
+        GROUP BY kb.id
+        ORDER BY CASE WHEN kb.kb_type = 'CASE_LIBRARY' THEN 0 ELSE 1 END, kb.updated_at DESC
+    </select>
+
+    <select id="listAllowedPersonalKbIds" resultType="string">
+        SELECT kb_id
+        FROM kb_knowledge_base
+        WHERE tenant_id = #{tenantId}
+          AND scope = 'PERSONAL'
+          AND owner_user_id = #{ownerUserId}
+          AND enabled = TRUE
+          AND status = 'ACTIVE'
+          AND deleted = FALSE
+        <if test="kbIds != null and kbIds.size() > 0">
+          AND kb_id IN
+          <foreach collection="kbIds" item="kbId" open="(" separator="," close=")">
+            #{kbId}
+          </foreach>
+        </if>
+    </select>
+
+    <insert id="insertContributionApplication" parameterType="com.aicsp.biz.entity.KnowledgeContributionApplication">
+        INSERT INTO kb_contribution_application (
+            id, application_id, tenant_id, application_type, source_document_id, source_kb_id,
+            source_snapshot_id, target_kb_id, target_version_no, applicant_user_id, status,
+            target_category_id, reason, reject_reason, review_comment, reviewer_user_id, reviewed_at, deleted
+        )
+        VALUES (
+            #{id}, #{applicationId}, #{tenantId}, #{applicationType}, #{sourceDocumentId}, #{sourceKbId},
+            #{sourceSnapshotId}, #{targetKbId}, #{targetVersionNo}, #{applicantUserId}, #{status},
+            #{targetCategoryId}, #{reason}, #{rejectReason}, #{reviewComment}, #{reviewerUserId}, #{reviewedAt}, FALSE
+        )
+    </insert>
+
+    <select id="findContributionApplication" resultMap="ContributionApplicationMap">
+        SELECT id, application_id, tenant_id, application_type, source_document_id, source_kb_id,
+               source_snapshot_id, target_kb_id, target_version_no, applicant_user_id, status,
+               target_category_id, reason, reject_reason, review_comment, reviewer_user_id,
+               reviewed_at, created_at, updated_at, deleted
+        FROM kb_contribution_application
+        WHERE application_id = #{applicationId}
+          AND deleted = FALSE
+        LIMIT 1
+    </select>
+
+    <select id="listContributionApplications" resultMap="ContributionApplicationMap">
+        SELECT id, application_id, tenant_id, application_type, source_document_id, source_kb_id,
+               source_snapshot_id, target_kb_id, target_version_no, applicant_user_id, status,
+               target_category_id, reason, reject_reason, review_comment, reviewer_user_id,
+               reviewed_at, created_at, updated_at, deleted
+        FROM kb_contribution_application
+        WHERE tenant_id = #{tenantId}
+          AND deleted = FALSE
+        <if test="applicantUserId != null and applicantUserId != ''">
+          AND applicant_user_id = #{applicantUserId}
+        </if>
+        <if test="status != null and status != ''">
+          AND status = #{status}
+        </if>
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="updateContributionApplication" parameterType="com.aicsp.biz.entity.KnowledgeContributionApplication">
+        UPDATE kb_contribution_application
+        SET status = #{status},
+            target_kb_id = #{targetKbId},
+            target_version_no = #{targetVersionNo},
+            reject_reason = #{rejectReason},
+            review_comment = #{reviewComment},
+            reviewer_user_id = #{reviewerUserId},
+            reviewed_at = #{reviewedAt},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE application_id = #{applicationId}
+          AND deleted = FALSE
+    </update>
+
+    <insert id="insertSnapshotDocument" parameterType="com.aicsp.biz.entity.KnowledgeSnapshotDocument">
+        INSERT INTO kb_snapshot_document (
+            id, snapshot_id, source_kb_id, source_version, source_document_id, title, source_type,
+            object_path, category_id, product_line, enabled, status, fingerprint, sort_order, deleted
+        )
+        VALUES (
+            #{id}, #{snapshotId}, #{sourceKbId}, #{sourceVersion}, #{sourceDocumentId}, #{title}, #{sourceType},
+            #{objectPath}, #{categoryId}, #{productLine}, #{enabled}, #{status}, #{fingerprint}, #{sortOrder}, FALSE
+        )
+    </insert>
+
+    <select id="listSnapshotDocuments" resultMap="SnapshotDocumentMap">
+        SELECT id, snapshot_id, source_kb_id, source_version, source_document_id, title, source_type,
+               object_path, category_id, product_line, enabled, status, fingerprint, sort_order,
+               created_at, deleted
+        FROM kb_snapshot_document
+        WHERE snapshot_id = #{snapshotId}
+          AND deleted = FALSE
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="listDocumentsBySourceKb" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE tenant_id = #{tenantId}
+          AND kb_id = #{kbId}
+          AND deleted = FALSE
+        <if test="kbVersion != null">
+          AND kb_version = #{kbVersion}
+        </if>
+        ORDER BY updated_at DESC, id DESC
+    </select>
+
+    <select id="findDocumentBySnapshotSource" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE kb_id = #{targetKbId}
+          AND source_document_id = #{sourceDocumentId}
+          AND deleted = FALSE
+        <if test="kbVersion != null">
+          AND kb_version = #{kbVersion}
+        </if>
+        ORDER BY kb_version DESC, updated_at DESC
+        LIMIT 1
+    </select>
 
     <sql id="DocumentWhere">
         deleted = FALSE
@@ -103,6 +474,48 @@
         WHERE <include refid="DocumentWhere"/>
     </select>
 
+    <select id="listDocumentsByKb" resultMap="DocumentMap">
+        SELECT <include refid="DocumentColumns"/>
+        FROM kb_document
+        WHERE deleted = FALSE
+          AND tenant_id = #{tenantId}
+          AND kb_id = #{kbId}
+        <if test="keyword != null and keyword != ''">
+            AND title ILIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <if test="categoryId != null and categoryId != ''">
+            AND category_id = #{categoryId}
+        </if>
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="enabled != null">
+            AND enabled = #{enabled}
+        </if>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDocumentsByKb" resultType="long">
+        SELECT COUNT(1)
+        FROM kb_document
+        WHERE deleted = FALSE
+          AND tenant_id = #{tenantId}
+          AND kb_id = #{kbId}
+        <if test="keyword != null and keyword != ''">
+            AND title ILIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <if test="categoryId != null and categoryId != ''">
+            AND category_id = #{categoryId}
+        </if>
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="enabled != null">
+            AND enabled = #{enabled}
+        </if>
+    </select>
+
     <select id="findDocument" resultMap="DocumentMap">
         SELECT <include refid="DocumentColumns"/>
         FROM kb_document
@@ -113,11 +526,13 @@
 
     <insert id="insertDocument" parameterType="com.aicsp.biz.entity.KnowledgeDocument">
         INSERT INTO kb_document (
-            id, document_id, tenant_id, scope, owner_user_id, title, source_type, object_path, category_id,
+            id, document_id, kb_id, kb_version, tenant_id, scope, owner_user_id, title, source_type, object_path,
+            source_document_id, source_snapshot_id, category_id,
             product_line, status, enabled, created_by, updated_by, deleted
         )
         VALUES (
-            #{id}, #{documentId}, #{tenantId}, #{scope}, #{ownerUserId}, #{title}, #{sourceType}, #{objectPath},
+            #{id}, #{documentId}, #{kbId}, #{kbVersion}, #{tenantId}, #{scope}, #{ownerUserId}, #{title}, #{sourceType}, #{objectPath},
+            #{sourceDocumentId}, #{sourceSnapshotId},
             #{categoryId}, #{productLine}, #{status}, #{enabled}, #{createdBy}, #{updatedBy}, FALSE
         )
     </insert>
@@ -275,15 +690,15 @@
 
     <insert id="insertTask" parameterType="com.aicsp.biz.entity.KnowledgeIngestionTask">
         INSERT INTO kb_ingestion_task (
-            task_id, document_id, task_type, status, progress, chunk_count, embedding_model, retry_count, error_message
+            task_id, document_id, kb_id, kb_version, task_type, status, progress, chunk_count, embedding_model, retry_count, error_message
         )
         VALUES (
-            #{taskId}, #{documentId}, #{taskType}, #{status}, #{progress}, #{chunkCount}, #{embeddingModel}, #{retryCount}, #{errorMessage}
+            #{taskId}, #{documentId}, #{kbId}, #{kbVersion}, #{taskType}, #{status}, #{progress}, #{chunkCount}, #{embeddingModel}, #{retryCount}, #{errorMessage}
         )
     </insert>
 
     <select id="findLatestTask" resultMap="TaskMap">
-        SELECT task_id, document_id, task_type, status, progress, chunk_count, embedding_model, retry_count,
+        SELECT task_id, document_id, kb_id, kb_version, task_type, status, progress, chunk_count, embedding_model, retry_count,
                error_message, created_at, updated_at
         FROM kb_ingestion_task
         WHERE document_id = #{documentId}
@@ -299,6 +714,7 @@
             progress = #{progress},
             chunk_count = #{chunkCount},
             embedding_model = #{embeddingModel},
+            retry_count = #{retryCount},
             error_message = #{errorMessage},
             updated_at = CURRENT_TIMESTAMP
         WHERE task_id = #{taskId}

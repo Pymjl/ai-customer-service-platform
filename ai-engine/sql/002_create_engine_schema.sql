@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS engine_service.engine_chunk (
     chunk_id        VARCHAR(96) NOT NULL,
     parent_chunk_id VARCHAR(96),
     document_id     VARCHAR(64) NOT NULL,
+    kb_id           VARCHAR(64) NOT NULL,
+    kb_version      INTEGER NOT NULL DEFAULT 1,
+    kb_type         VARCHAR(32) NOT NULL,
     tenant_id       VARCHAR(64) NOT NULL,
     scope           VARCHAR(16) NOT NULL,
     owner_user_id   VARCHAR(64) NULL,
@@ -84,12 +87,20 @@ CREATE TABLE IF NOT EXISTS engine_service.engine_retrieval_log (
     created_at             TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE engine_service.engine_chunk ADD COLUMN IF NOT EXISTS kb_id VARCHAR(64) NOT NULL DEFAULT 'kb_default';
+ALTER TABLE engine_service.engine_chunk ADD COLUMN IF NOT EXISTS kb_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE engine_service.engine_chunk ADD COLUMN IF NOT EXISTS kb_type VARCHAR(32) NOT NULL DEFAULT 'GENERIC_PUBLIC';
+
 CREATE UNIQUE INDEX IF NOT EXISTS uk_engine_chunk_id
     ON engine_service.engine_chunk (chunk_id)
     WHERE deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_engine_chunk_doc
     ON engine_service.engine_chunk (document_id)
+    WHERE deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_engine_chunk_kb
+    ON engine_service.engine_chunk (kb_id, kb_version)
     WHERE deleted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_engine_chunk_case

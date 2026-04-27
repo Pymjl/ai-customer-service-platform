@@ -27,6 +27,8 @@ public class ChatRequest {
         private String mode;
         private Boolean includePublic;
         private Boolean includePersonal;
+        private List<String> personalKbIds;
+        private List<String> kbIds;
         private List<String> documentIds;
         private List<String> categoryIds;
         private List<String> tagIds;

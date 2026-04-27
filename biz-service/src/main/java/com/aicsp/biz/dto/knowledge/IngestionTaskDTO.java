@@ -7,6 +7,8 @@ import lombok.Data;
 public class IngestionTaskDTO {
 
     private String documentId;
+    private String kbId;
+    private Integer kbVersion;
     private String taskId;
     private String status;
     private Integer progress;

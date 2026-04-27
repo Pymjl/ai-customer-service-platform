@@ -22,14 +22,17 @@ def format_rag_context(hits: list[RetrieveHit], max_items: int = 5) -> tuple[str
     citations: list[dict[str, Any]] = []
     for index, hit in enumerate(hits[:max_items], start=1):
         metadata = hit.metadata
-        title = str(metadata.get("title") or hit.documentId)
+        citation_id = f"c_{index}"
+        title = hit.documentTitle or str(metadata.get("document_title") or metadata.get("title") or hit.documentId)
+        kb_name = hit.kbName or str(metadata.get("kb_name") or hit.kbId or "未命名知识库")
         case_id = metadata.get("case_id")
         field = metadata.get("case_field_title") or metadata.get("case_field")
-        source = f"{title}"
+        source = f"{kb_name} > {title}"
         if case_id:
             source += f" / 工单 {case_id}"
         if field:
             source += f" / {field}"
+        source += f" / 引用 [^{citation_id}]"
         context_parts.append(
             KNOWLEDGE_SNIPPET_TEMPLATE.format(
                 index=index,
@@ -40,15 +43,23 @@ def format_rag_context(hits: list[RetrieveHit], max_items: int = 5) -> tuple[str
         )
         citations.append(
             {
+                "citationId": citation_id,
+                "kbId": hit.kbId,
+                "kbName": kb_name,
+                "kbType": hit.kbType or metadata.get("kb_type"),
+                "kbVersion": hit.kbVersion or metadata.get("kb_version"),
                 "documentId": hit.documentId,
+                "documentTitle": title,
                 "chunkId": hit.chunkId,
                 "parentChunkId": hit.parentChunkId,
                 "matchedChildIds": _string_list(metadata.get("matched_child_ids")),
                 "matchedFields": _string_list(metadata.get("matched_child_fields")),
-                "title": title,
+                "sectionPath": hit.sectionPath or _string_list(metadata.get("section_path")),
+                "snippet": hit.content[:500],
                 "caseId": case_id,
                 "field": field,
                 "score": hit.score,
+                "anchor": hit.position,
             }
         )
     return "\n\n".join(context_parts), citations

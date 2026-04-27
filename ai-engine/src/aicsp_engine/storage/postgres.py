@@ -36,14 +36,15 @@ class PostgresVectorStore:
         chunk_query = SQL(
             """
             INSERT INTO {schema}.{chunk_table} (
-                chunk_id, parent_chunk_id, document_id, tenant_id, scope, owner_user_id,
+                chunk_id, parent_chunk_id, document_id, kb_id, kb_version, kb_type, tenant_id, scope, owner_user_id,
                 chunk_type, source_type, case_id, case_field, section_path, content,
                 content_hash, metadata, token_count, quality_score, status, enabled,
                 deleted, updated_at
             )
             VALUES (
-                %(chunk_id)s, %(parent_chunk_id)s, %(document_id)s, %(tenant_id)s,
-                %(scope)s, %(owner_user_id)s, %(chunk_type)s, %(source_type)s,
+                %(chunk_id)s, %(parent_chunk_id)s, %(document_id)s, %(kb_id)s,
+                %(kb_version)s, %(kb_type)s, %(tenant_id)s, %(scope)s,
+                %(owner_user_id)s, %(chunk_type)s, %(source_type)s,
                 %(case_id)s, %(case_field)s, %(section_path)s, %(content)s,
                 %(content_hash)s, %(metadata)s, %(token_count)s, %(quality_score)s,
                 %(status)s, %(enabled)s, FALSE, CURRENT_TIMESTAMP
@@ -51,6 +52,9 @@ class PostgresVectorStore:
             ON CONFLICT (chunk_id) WHERE deleted = FALSE
             DO UPDATE SET
                 parent_chunk_id = EXCLUDED.parent_chunk_id,
+                kb_id = EXCLUDED.kb_id,
+                kb_version = EXCLUDED.kb_version,
+                kb_type = EXCLUDED.kb_type,
                 tenant_id = EXCLUDED.tenant_id,
                 scope = EXCLUDED.scope,
                 owner_user_id = EXCLUDED.owner_user_id,
@@ -182,6 +186,10 @@ class PostgresVectorStore:
                 c.chunk_id,
                 c.parent_chunk_id,
                 c.document_id,
+                c.kb_id,
+                c.kb_version,
+                c.kb_type,
+                c.section_path,
                 c.content,
                 c.metadata,
                 c.quality_score,
@@ -256,6 +264,10 @@ class PostgresVectorStore:
                 chunk_id,
                 parent_chunk_id,
                 document_id,
+                kb_id,
+                kb_version,
+                kb_type,
+                section_path,
                 content,
                 metadata,
                 quality_score
@@ -399,17 +411,30 @@ class PostgresVectorStore:
         return max(1, min(requested, self._settings.retrieval_top_k_max))
 
     def _build_filters(self, request: RetrieveRequest) -> tuple[Any, list[Any]]:
-        clauses: list[SQL] = [SQL("AND c.tenant_id = %s")]
+        clauses: list[Any] = [SQL("AND c.tenant_id = %s")]
         params: list[Any] = [request.tenantId]
 
         status = request.filters.get("status", "READY")
-        enabled = request.filters.get("enabled", True)
+        enabled = request.filters.get("docEnabled", request.filters.get("enabled", True))
         if status is not None:
             clauses.append(SQL("AND c.status = %s"))
             params.append(status)
         if enabled is not None:
             clauses.append(SQL("AND c.enabled = %s"))
             params.append(enabled)
+
+        allowed_kb_ids = request.allowedKbIds or _string_list(request.filters.get("allowedKbIds"))
+        if allowed_kb_ids:
+            clauses.append(SQL("AND c.kb_id = ANY(%s)"))
+            params.append(allowed_kb_ids)
+
+        kb_version_map = request.filters.get("kbVersionMap")
+        if isinstance(kb_version_map, dict) and kb_version_map:
+            version_clauses: list[SQL] = []
+            for kb_id, version in kb_version_map.items():
+                version_clauses.append(SQL("(c.kb_id = %s AND c.kb_version = %s)"))
+                params.extend([str(kb_id), int(version)])
+            clauses.append(SQL("AND (") + SQL(" OR ").join(version_clauses) + SQL(")"))
 
         product_line = request.filters.get("productLine")
         if product_line:
@@ -465,6 +490,9 @@ def _chunk_params(chunk: Chunk) -> dict[str, Any]:
         "chunk_id": chunk.chunk_id,
         "parent_chunk_id": chunk.parent_chunk_id,
         "document_id": chunk.document_id,
+        "kb_id": chunk.kb_id,
+        "kb_version": chunk.kb_version,
+        "kb_type": chunk.kb_type,
         "tenant_id": chunk.tenant_id,
         "scope": chunk.scope,
         "owner_user_id": chunk.owner_user_id,
@@ -498,11 +526,42 @@ def _row_to_hit(
     return RetrieveHit(
         chunkId=str(row["chunk_id"]),
         parentChunkId=str(row["parent_chunk_id"]) if row["parent_chunk_id"] else None,
+        kbId=str(row["kb_id"]) if row.get("kb_id") else metadata.get("kb_id"),
+        kbName=str(metadata.get("kb_name") or ""),
+        kbType=str(row["kb_type"]) if row.get("kb_type") else metadata.get("kb_type"),
+        kbVersion=int(row["kb_version"]) if row.get("kb_version") is not None else metadata.get("kb_version"),
         documentId=str(row["document_id"]),
+        documentTitle=str(metadata.get("document_title") or metadata.get("title") or row["document_id"]),
+        sectionPath=_json_list(row.get("section_path") or metadata.get("section_path")),
         content=str(row["content"]),
         score=score,
+        position=_position_from_metadata(metadata),
         metadata=metadata,
     )
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item is not None]
+
+
+def _json_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item is not None]
+    return []
+
+
+def _position_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    position = metadata.get("position")
+    if isinstance(position, dict):
+        return position
+    anchor = {
+        key: metadata.get(key)
+        for key in ("page", "charStart", "charEnd")
+        if metadata.get(key) is not None
+    }
+    return anchor
 
 
 def _parent_match_metadata(

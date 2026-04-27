@@ -4,27 +4,26 @@ import java.time.OffsetDateTime;
 import lombok.Data;
 
 @Data
-public class KnowledgeDocument {
+public class KnowledgeBase {
 
     private Long id;
-    private String documentId;
     private String kbId;
-    private Integer kbVersion;
     private String tenantId;
     private String scope;
     private String ownerUserId;
-    private String title;
-    private String sourceType;
-    private String objectPath;
-    private String sourceDocumentId;
-    private String sourceSnapshotId;
-    private String categoryId;
-    private String productLine;
-    private String status;
+    private String name;
+    private String description;
+    private String kbType;
+    private String sourceKbId;
+    private Integer sourceVersion;
+    private Integer currentVersion;
     private Boolean enabled;
+    private String status;
+    private Boolean locked;
     private Long createdBy;
     private OffsetDateTime createdAt;
     private Long updatedBy;
     private OffsetDateTime updatedAt;
     private Boolean deleted;
+    private Long documentCount;
 }

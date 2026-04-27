@@ -24,6 +24,8 @@ class IngestionPipeline:
         started = perf_counter()
         metrics: dict[str, object] = {
             "document_id": request.documentId,
+            "kb_id": request.kbId,
+            "kb_version": request.kbVersion,
             "operation": operation,
             "embedding_model": self._settings.embedding_model,
         }
@@ -136,6 +138,10 @@ class IngestionPipeline:
 def _to_chunk_document(request: IngestRequest, text: str) -> ChunkDocument:
     return ChunkDocument(
         document_id=request.documentId,
+        kb_id=request.kbId,
+        kb_version=request.kbVersion,
+        kb_type=request.kbType,
+        kb_name=request.kbName,
         title=request.title,
         text=text,
         tenant_id=request.tenantId,

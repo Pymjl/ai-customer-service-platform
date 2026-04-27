@@ -76,6 +76,8 @@ def _selection_payload(selection: KnowledgeSelection | None) -> dict[str, Any]:
             "mode": "DEFAULT",
             "includePublic": True,
             "includePersonal": True,
+            "personalKbIds": [],
+            "kbIds": [],
             "documentIds": [],
             "categoryIds": [],
             "tagIds": [],

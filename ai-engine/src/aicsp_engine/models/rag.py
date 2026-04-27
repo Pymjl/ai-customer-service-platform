@@ -13,12 +13,17 @@ TaskStatus = Literal["SUBMITTED", "PARSING", "CHUNKING", "EMBEDDING", "INDEXING"
 class IngestRequest(BaseModel):
     taskId: str
     documentId: str
+    kbId: str = "kb_default"
+    kbVersion: int = 1
+    kbType: str = "GENERIC_PUBLIC"
+    kbName: str | None = None
     scope: Scope
     tenantId: str
     ownerUserId: str | None = None
     objectPath: str | None = None
     rawText: str | None = None
     title: str
+    documentTitle: str | None = None
     sourceType: str = "UNKNOWN"
     categoryId: str | None = None
     productLine: str | None = None
@@ -40,6 +45,8 @@ class DeleteRequest(BaseModel):
     taskId: str
     documentId: str
     tenantId: str
+    kbId: str | None = None
+    kbVersion: int | None = None
     traceId: str | None = None
 
 
@@ -62,6 +69,7 @@ class RetrieveRequest(BaseModel):
     query: str
     tenantId: str
     userId: str | None = None
+    allowedKbIds: list[str] = Field(default_factory=list)
     allowedScopes: list[str] = Field(default_factory=list)
     knowledgeSelection: KnowledgeSelection | None = None
     filters: dict[str, Any] = Field(default_factory=dict)
@@ -72,9 +80,16 @@ class RetrieveRequest(BaseModel):
 class RetrieveHit(BaseModel):
     chunkId: str
     parentChunkId: str | None = None
+    kbId: str | None = None
+    kbName: str | None = None
+    kbType: str | None = None
+    kbVersion: int | None = None
     documentId: str
+    documentTitle: str | None = None
+    sectionPath: list[str] = Field(default_factory=list)
     content: str
     score: float
+    position: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -88,6 +103,10 @@ class RetrieveResponse(BaseModel):
 
 class ChunkDocumentRequest(BaseModel):
     documentId: str
+    kbId: str = "kb_preview"
+    kbVersion: int = 1
+    kbType: str = "GENERIC_PUBLIC"
+    kbName: str | None = None
     title: str
     text: str
     tenantId: str = "default"
@@ -111,6 +130,10 @@ class ChunkDocumentRequest(BaseModel):
     def to_chunk_document(self) -> ChunkDocument:
         return ChunkDocument(
             document_id=self.documentId,
+            kb_id=self.kbId,
+            kb_version=self.kbVersion,
+            kb_type=self.kbType,
+            kb_name=self.kbName,
             title=self.title,
             text=self.text,
             tenant_id=self.tenantId,

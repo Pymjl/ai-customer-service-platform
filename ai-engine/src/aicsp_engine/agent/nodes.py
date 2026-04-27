@@ -57,6 +57,7 @@ async def retrieve(state: AgentState, settings: Settings) -> AgentState:
         query=state.normalized_query,
         tenantId=str(filter_result.get("tenantId") or state.request.tenantId or "default"),
         userId=state.request.userId,
+        allowedKbIds=[str(kb_id) for kb_id in filter_result.get("allowedKbIds", [])],
         allowedScopes=[str(scope) for scope in filter_result.get("allowedScopes", [])],
         knowledgeSelection=selection,
         filters=dict(filters),
