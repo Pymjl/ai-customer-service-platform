@@ -1,47 +1,62 @@
 <template>
-  <div class="auth-shell">
-    <section class="auth-hero">
+  <main class="login-page">
+    <section class="login-card" aria-labelledby="login-title">
       <div class="auth-brand">
-        <el-icon><Service /></el-icon>
-        <span>AI Customer Service</span>
+        <span class="brand-mark">
+          <n-icon :component="Bot24Regular" />
+        </span>
+        <div>
+          <strong>智能客服工作站</strong>
+          <span>AI Customer Service</span>
+        </div>
       </div>
-      <h1>AI 智能客服平台</h1>
-      <p>为用户提供智能问答、业务咨询和服务协同入口，让常见问题处理更及时、更清晰。</p>
-    </section>
-    <section class="auth-panel-wrap">
-      <div class="auth-panel">
-        <h2>欢迎登录</h2>
-        <p class="hint">请输入账户名和密码进入系统</p>
-        <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @keyup.enter="handleLogin">
-          <el-form-item label="账户名" prop="username">
-            <el-input v-model.trim="form.username" size="large" maxlength="100" show-word-limit placeholder="请输入账户名" prefix-icon="User" />
-          </el-form-item>
-          <el-form-item label="密码" prop="password">
-            <el-input v-model="form.password" size="large" type="password" show-password placeholder="请输入密码" prefix-icon="Lock" />
-          </el-form-item>
-          <el-form-item label="安全验证" prop="captchaToken">
-            <SliderCaptcha ref="captchaRef" @verified="form.captchaToken = $event" @reset="form.captchaToken = ''" />
-          </el-form-item>
-          <el-button class="submit" type="primary" size="large" :loading="loading" @click="handleLogin">登录</el-button>
-        </el-form>
-        <div class="auth-link">还没有账户？<RouterLink to="/register">立即注册</RouterLink></div>
+
+      <div class="auth-heading">
+        <h1 id="login-title">欢迎回来</h1>
+        <p>请登录以继续探索您的 AI 知识库</p>
       </div>
+
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" @keyup.enter="handleLogin">
+        <n-form-item label="账户名" path="username">
+          <n-input v-model:value="form.username" maxlength="100" show-count placeholder="请输入账户名">
+            <template #prefix>
+              <n-icon :component="Person24Regular" />
+            </template>
+          </n-input>
+        </n-form-item>
+        <n-form-item label="密码" path="password">
+          <n-input v-model:value="form.password" type="password" show-password-on="click" placeholder="请输入密码">
+            <template #prefix>
+              <n-icon :component="LockClosed24Regular" />
+            </template>
+          </n-input>
+        </n-form-item>
+        <n-form-item label="安全验证" path="captchaToken">
+          <SliderCaptcha ref="captchaRef" @verified="form.captchaToken = $event" @reset="form.captchaToken = ''" />
+        </n-form-item>
+        <n-button class="submit" type="primary" size="large" block :loading="loading" @click="handleLogin">
+          登录
+        </n-button>
+      </n-form>
+
+      <div class="auth-link">还没有账户？<RouterLink to="/register">立即注册</RouterLink></div>
     </section>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { FormInstance, FormRules } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import type { FormInst, FormRules } from 'naive-ui'
+import { Bot24Regular, LockClosed24Regular, Person24Regular } from '@vicons/fluent'
 import SliderCaptcha from '@/components/SliderCaptcha.vue'
 import { useAuthStore } from '@/stores/auth'
+import { message } from '@/utils/feedback'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const formRef = ref<FormInstance>()
+const formRef = ref<FormInst | null>(null)
 const captchaRef = ref<InstanceType<typeof SliderCaptcha>>()
 const loading = ref(false)
 
@@ -67,7 +82,7 @@ async function handleLogin() {
   loading.value = true
   try {
     await authStore.login({ ...form, username: form.username.toLowerCase() })
-    ElMessage.success('登录成功')
+    message.success('登录成功')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.replace(redirect)
   } catch {
@@ -79,22 +94,121 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.submit {
-  width: 100%;
-  height: 44px;
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+.login-page::before {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  background-image:
+    radial-gradient(at 0% 0%, var(--mesh-color-1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, var(--mesh-color-2) 0, transparent 50%),
+    radial-gradient(at 100% 100%, var(--mesh-color-3) 0, transparent 50%);
+  animation: meshBreathe 15s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 460px);
+  padding: 48px;
+  color: var(--text-primary);
+  background: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur-card));
+  -webkit-backdrop-filter: blur(var(--glass-blur-card));
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg), var(--glass-highlight);
+  animation: spatialFadeIn var(--duration-spring) var(--ease-spring) both;
+}
+
+.login-card:hover {
+  background: var(--glass-surface-hover);
+}
+
+.auth-brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 34px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--text-on-accent);
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-primary));
+  box-shadow: 0 12px 24px var(--accent-primary-muted);
+}
+
+.auth-brand strong,
+.auth-brand span,
+.auth-heading h1,
+.auth-heading p {
+  display: block;
+  margin: 0;
+}
+
+.auth-brand strong {
+  font-size: 17px;
+}
+
+.auth-brand span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.auth-heading {
+  margin-bottom: 28px;
+}
+
+.auth-heading h1 {
+  font-size: 32px;
+  line-height: var(--leading-tight);
+}
+
+.auth-heading p {
   margin-top: 8px;
-  border-radius: 12px;
-  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.submit {
+  height: 46px;
+  margin-top: 4px;
 }
 
 .auth-link {
-  margin-top: 20px;
+  margin-top: 22px;
+  color: var(--text-muted);
   text-align: center;
-  color: #64748b;
 }
 
 .auth-link a {
-  color: #2563eb;
-  font-weight: 700;
+  color: var(--accent-primary);
+  font-weight: 750;
+}
+
+@media (max-width: 767px) {
+  .login-page {
+    padding: 16px;
+  }
+
+  .login-card {
+    padding: 28px 20px;
+    border-radius: 18px;
+  }
 }
 </style>

@@ -10,9 +10,9 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@element-plus/icons-vue": "^2.3.1",
+    "@vicons/fluent": "^0.13.0",
     "axios": "^1.6.8",
-    "element-plus": "^2.7.2",
+    "naive-ui": "^2.44.1",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"

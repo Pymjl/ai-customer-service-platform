@@ -1,80 +1,91 @@
 <template>
-  <div>
+  <div class="page-shell">
     <div class="page-header">
       <div>
         <h1 class="page-title">用户管理</h1>
         <p class="page-subtitle">维护用户账户名、头像、昵称和联系方式</p>
       </div>
-      <el-button type="primary" icon="Plus" @click="openCreate">新增用户</el-button>
+      <n-button type="primary" @click="openCreate">
+        <template #icon><n-icon :component="Add24Regular" /></template>
+        新增用户
+      </n-button>
     </div>
 
-    <el-card class="page-card">
+    <section class="page-card">
       <div class="toolbar">
-        <el-input v-model="query.keyword" clearable placeholder="搜索账户名 / 昵称 / 邮箱" style="width: 280px" @keyup.enter="loadData" />
-        <el-button type="primary" icon="Search" @click="loadData">查询</el-button>
-        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+        <n-input v-model:value="query.keyword" clearable placeholder="搜索账户名 / 昵称 / 邮箱" @keyup.enter="loadData">
+          <template #prefix><n-icon :component="Search24Regular" /></template>
+        </n-input>
+        <n-button type="primary" @click="loadData">查询</n-button>
+        <n-button @click="resetQuery">
+          <template #icon><n-icon :component="ArrowSync24Regular" /></template>
+          重置
+        </n-button>
       </div>
-      <el-table v-loading="loading" :data="users" stripe>
-        <el-table-column label="头像" width="80">
-          <template #default="{ row }">
-            <el-avatar :src="row.avatarPath || defaultAvatar" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="username" label="账户名" min-width="120" />
-        <el-table-column prop="realName" label="昵称" min-width="120" />
-        <el-table-column label="性别" width="90">
-          <template #default="{ row }">{{ genderText(row.gender) }}</template>
-        </el-table-column>
-        <el-table-column prop="age" label="年龄" width="80" />
-        <el-table-column prop="email" label="邮箱" min-width="170" />
-        <el-table-column prop="phone" label="电话" min-width="130" />
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination class="pagination" layout="total, prev, pager, next, sizes" :total="total" v-model:current-page="query.current" v-model:page-size="query.size" @change="loadData" />
-    </el-card>
+      <n-spin :show="loading">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>头像</th>
+              <th>账户名</th>
+              <th>昵称</th>
+              <th>性别</th>
+              <th>年龄</th>
+              <th>邮箱</th>
+              <th>电话</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in users" :key="row.userId">
+              <td><n-avatar round :src="resolveAvatarUrl(row.avatarPath)" :fallback-src="defaultAvatar" /></td>
+              <td>{{ row.username }}</td>
+              <td>{{ row.realName || '-' }}</td>
+              <td>{{ genderText(row.gender) }}</td>
+              <td>{{ row.age || '-' }}</td>
+              <td>{{ row.email || '-' }}</td>
+              <td>{{ row.phone || '-' }}</td>
+              <td><span class="status-pill" :class="row.status === 1 ? 'success' : ''">{{ row.status === 1 ? '启用' : '停用' }}</span></td>
+              <td><n-button text type="primary" @click="openEdit(row)">编辑</n-button></td>
+            </tr>
+          </tbody>
+        </table>
+        <n-empty v-if="!users.length" description="暂无用户" />
+      </n-spin>
+      <n-pagination class="pagination" v-model:page="query.current" v-model:page-size="query.size" show-size-picker :item-count="total" @update:page="loadData" @update:page-size="loadData" />
+    </section>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑用户' : '新增用户'" width="560px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="账户名" prop="username"><el-input v-model.trim="form.username" :disabled="Boolean(editingId)" maxlength="100" show-word-limit /></el-form-item>
-        <el-form-item v-if="!editingId" label="密码" prop="password"><el-input v-model="form.password" type="password" show-password maxlength="100" /></el-form-item>
-        <el-form-item label="昵称" prop="realName"><el-input v-model.trim="form.realName" maxlength="50" show-word-limit /></el-form-item>
-        <el-form-item label="性别" prop="gender">
-          <el-select v-model="form.gender" style="width: 100%">
-            <el-option label="保密" :value="0" />
-            <el-option label="男" :value="1" />
-            <el-option label="女" :value="2" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="年龄" prop="age"><el-input-number v-model="form.age" :min="1" :max="120" style="width: 100%" /></el-form-item>
-        <el-form-item label="邮箱" prop="email"><el-input v-model.trim="form.email" maxlength="128" /></el-form-item>
-        <el-form-item label="电话" prop="phone"><el-input v-model.trim="form.phone" maxlength="32" /></el-form-item>
-        <el-form-item label="住址" prop="address"><el-input v-model.trim="form.address" type="textarea" :rows="2" maxlength="256" show-word-limit /></el-form-item>
-        <el-form-item label="状态"><el-switch v-model="enabled" active-text="启用" inactive-text="停用" /></el-form-item>
-      </el-form>
+    <n-modal v-model:show="dialogVisible" preset="card" :title="editingId ? '编辑用户' : '新增用户'" class="form-modal">
+      <n-form ref="formRef" :model="form" :rules="rules" label-placement="left" label-width="90">
+        <n-form-item label="账户名" path="username"><n-input v-model:value="form.username" :disabled="Boolean(editingId)" maxlength="100" show-count /></n-form-item>
+        <n-form-item v-if="!editingId" label="密码" path="password"><n-input v-model:value="form.password" type="password" show-password-on="click" maxlength="100" /></n-form-item>
+        <n-form-item label="昵称" path="realName"><n-input v-model:value="form.realName" maxlength="50" show-count /></n-form-item>
+        <n-form-item label="性别" path="gender"><n-select v-model:value="form.gender" :options="genderOptions" /></n-form-item>
+        <n-form-item label="年龄" path="age"><n-input-number v-model:value="form.age" :min="1" :max="120" /></n-form-item>
+        <n-form-item label="邮箱" path="email"><n-input v-model:value="form.email" maxlength="128" /></n-form-item>
+        <n-form-item label="电话" path="phone"><n-input v-model:value="form.phone" maxlength="32" /></n-form-item>
+        <n-form-item label="住址" path="address"><n-input v-model:value="form.address" type="textarea" :rows="2" maxlength="256" show-count /></n-form-item>
+        <n-form-item label="状态"><n-switch v-model:value="enabled"><template #checked>启用</template><template #unchecked>停用</template></n-switch></n-form-item>
+      </n-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+        <div class="modal-actions">
+          <n-button @click="dialogVisible = false">取消</n-button>
+          <n-button type="primary" :loading="saving" @click="handleSave">保存</n-button>
+        </div>
       </template>
-    </el-dialog>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import type { FormInstance, FormRules } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import type { FormInst, FormRules } from 'naive-ui'
+import { Add24Regular, ArrowSync24Regular, Search24Regular } from '@vicons/fluent'
 import { createUser, fetchUsers, updateUser } from '@/api/system'
 import type { UserItem } from '@/types/system'
-import defaultAvatar from '@/assets/default-avatar.webp'
+import { defaultAvatar, resolveAvatarUrl } from '@/utils/avatar'
+import { message } from '@/utils/feedback'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -82,11 +93,16 @@ const users = ref<UserItem[]>([])
 const total = ref(0)
 const dialogVisible = ref(false)
 const editingId = ref<UserItem['userId'] | null>(null)
-const formRef = ref<FormInstance>()
+const formRef = ref<FormInst | null>(null)
 
 const query = reactive({ keyword: '', current: 1, size: 10 })
 const form = reactive({ username: '', password: '', tenantId: 'default', realName: '', gender: 0, age: 18, email: '', phone: '', address: '', status: 1 })
 const enabled = computed({ get: () => form.status === 1, set: (value: boolean) => { form.status = value ? 1 : 0 } })
+const genderOptions = [
+  { label: '保密', value: 0 },
+  { label: '男', value: 1 },
+  { label: '女', value: 2 }
+]
 const usernamePattern = /^[A-Za-z0-9]{1,100}$/
 const nicknamePattern = /^[\p{L}\p{N}_\-\s]{1,50}$/u
 const phonePattern = /^\+?[0-9][0-9\-\s]{5,30}$/
@@ -103,9 +119,9 @@ const rules: FormRules = {
     { required: true, message: '请输入昵称', trigger: 'blur' },
     { pattern: nicknamePattern, message: '昵称仅支持中英文、数字、空格、下划线和短横线，长度不超过 50 位', trigger: 'blur' }
   ],
-  gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  gender: [{ required: true, type: 'number', message: '请选择性别', trigger: 'change' }],
   age: [
-    { required: true, message: '请输入年龄', trigger: 'change' },
+    { required: true, type: 'number', message: '请输入年龄', trigger: 'change' },
     { type: 'number', min: 1, max: 120, message: '年龄范围为 1-120', trigger: 'change' }
   ],
   email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }],
@@ -156,7 +172,7 @@ async function handleSave() {
     } else {
       await createUser(payload)
     }
-    ElMessage.success('保存成功')
+    message.success('保存成功')
     dialogVisible.value = false
     loadData()
   } finally {
@@ -168,6 +184,26 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.pagination { margin-top: 18px; justify-content: flex-end; }
-.muted { color: #94a3b8; }
+.toolbar :deep(.n-input) {
+  max-width: 320px;
+}
+
+.pagination {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.form-modal {
+  width: min(92vw, 580px);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+:deep(.n-input-number) {
+  width: 100%;
+}
 </style>

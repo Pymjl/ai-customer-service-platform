@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { message } from '@/utils/feedback'
 
 interface RetryRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
@@ -81,13 +81,13 @@ service.interceptors.response.use(
     const result = response.data
     if (result && typeof result.succeed === 'boolean') {
       if (!result.succeed) {
-        ElMessage.error(result.message || '请求处理失败')
+        message.error(result.message || '请求处理失败')
         return Promise.reject(result)
       }
       return result.data
     }
     if (result && typeof result.code === 'number' && result.code !== 0 && result.code !== 200) {
-      ElMessage.error(result.message || '请求处理失败')
+      message.error(result.message || '请求处理失败')
       return Promise.reject(result)
     }
     return Object.prototype.hasOwnProperty.call(result || {}, 'data') ? result.data : result
@@ -115,7 +115,7 @@ service.interceptors.response.use(
       } catch (refreshError) {
         authStore.clearSession()
         router.replace('/login')
-        ElMessage.warning('登录状态已过期，请重新登录')
+        message.warning('登录状态已过期，请重新登录')
         return Promise.reject(refreshError)
       }
     }
@@ -127,9 +127,9 @@ service.interceptors.response.use(
     if (error.response?.status === 401) {
       authStore.clearSession()
       router.replace('/login')
-      ElMessage.warning('登录状态已过期，请重新登录')
+      message.warning('登录状态已过期，请重新登录')
     } else {
-      ElMessage.error(error.response?.data?.message || error.message || '网络请求失败')
+      message.error(error.response?.data?.message || error.message || '网络请求失败')
     }
     return Promise.reject(error)
   }

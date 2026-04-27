@@ -1,80 +1,70 @@
 <template>
-  <div>
+  <div class="page-shell">
     <div class="page-header">
       <div>
         <h1 class="page-title">用户角色授权</h1>
         <p class="page-subtitle">为用户分配一个或多个角色，角色变更会在用户重新登录后刷新到访问令牌</p>
       </div>
       <div class="header-actions">
-        <el-button icon="Refresh" :disabled="!selectedUser" @click="resetSelection">重置</el-button>
-        <el-button type="primary" icon="Check" :disabled="!selectedUser || !hasChanges" :loading="saving" @click="handleSave">
+        <n-button :disabled="!selectedUser" @click="resetSelection">
+          <template #icon><n-icon :component="ArrowSync24Regular" /></template>
+          重置
+        </n-button>
+        <n-button type="primary" :disabled="!selectedUser || !hasChanges" :loading="saving" @click="handleSave">
+          <template #icon><n-icon :component="Save24Regular" /></template>
           保存授权
-        </el-button>
+        </n-button>
       </div>
     </div>
 
     <div class="grant-layout">
-      <el-card class="page-card user-card">
-        <template #header>
-          <div class="card-header">
-            <span>用户</span>
-            <el-tag type="info" effect="plain">{{ total }} 人</el-tag>
-          </div>
-        </template>
-
-        <div class="user-toolbar">
-          <el-input v-model="query.keyword" clearable placeholder="搜索账号、姓名、邮箱" prefix-icon="Search" @keyup.enter="loadUsers" />
-          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+      <section class="page-card user-card">
+        <div class="card-header">
+          <span>用户</span>
+          <span class="status-pill">{{ total }} 人</span>
         </div>
 
-        <el-table
-          v-loading="userLoading"
-          :data="users"
-          class="user-table"
-          highlight-current-row
-          row-key="userId"
-          @current-change="selectUser"
-        >
-          <el-table-column label="用户" min-width="210">
-            <template #default="{ row }">
-              <div class="user-cell">
-                <el-avatar :size="34" :src="row.avatarPath || defaultAvatar">{{ avatarText(row) }}</el-avatar>
-                <div>
-                  <strong>{{ row.realName || row.username }}</strong>
-                  <small>{{ row.username }}</small>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="82">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
+        <div class="user-toolbar">
+          <n-input v-model:value="query.keyword" clearable placeholder="搜索账号、姓名、邮箱" @keyup.enter="loadUsers">
+            <template #prefix><n-icon :component="Search24Regular" /></template>
+          </n-input>
+          <n-button @click="resetQuery">重置</n-button>
+        </div>
 
-        <el-pagination
-          class="pagination"
-          layout="prev, pager, next"
-          :total="total"
-          v-model:current-page="query.current"
-          v-model:page-size="query.size"
-          @change="loadUsers"
-        />
-      </el-card>
-
-      <el-card class="page-card role-card">
-        <template #header>
-          <div class="card-header">
-            <span>角色分配</span>
-            <el-tag v-if="selectedUser" type="primary" effect="plain">{{ selectedUser.realName || selectedUser.username }}</el-tag>
+        <n-spin :show="userLoading">
+          <div class="user-list">
+            <button
+              v-for="user in users"
+              :key="user.userId"
+              type="button"
+              class="user-row"
+              :class="{ active: selectedUser?.userId === user.userId }"
+              @click="selectUser(user)"
+            >
+              <n-avatar round :size="34" :src="resolveAvatarUrl(user.avatarPath)" :fallback-src="defaultAvatar">{{ avatarText(user) }}</n-avatar>
+              <span>
+                <strong>{{ user.realName || user.username }}</strong>
+                <small>{{ user.username }}</small>
+              </span>
+              <span class="status-pill" :class="user.status === 1 ? 'success' : ''">{{ user.status === 1 ? '启用' : '停用' }}</span>
+            </button>
           </div>
-        </template>
+          <n-empty v-if="!users.length" description="暂无用户" />
+        </n-spin>
 
-        <el-empty v-if="!selectedUser" description="请选择左侧用户后分配角色" />
+        <n-pagination class="pagination" v-model:page="query.current" v-model:page-size="query.size" :item-count="total" @update:page="loadUsers" />
+      </section>
+
+      <section class="page-card role-card">
+        <div class="card-header">
+          <span>角色分配</span>
+          <span v-if="selectedUser" class="status-pill primary">{{ selectedUser.realName || selectedUser.username }}</span>
+        </div>
+
+        <n-empty v-if="!selectedUser" description="请选择左侧用户后分配角色" />
         <template v-else>
           <div class="selected-user">
-            <el-avatar :size="44" :src="selectedUser.avatarPath || defaultAvatar">{{ avatarText(selectedUser) }}</el-avatar>
+            <n-avatar round :size="44" :src="resolveAvatarUrl(selectedUser.avatarPath)" :fallback-src="defaultAvatar">{{ avatarText(selectedUser) }}</n-avatar>
             <div>
               <strong>{{ selectedUser.realName || selectedUser.username }}</strong>
               <span>{{ selectedUser.username }} · {{ selectedUser.email || '未填写邮箱' }}</span>
@@ -83,66 +73,59 @@
 
           <div class="assignment-summary">
             <span>已选 {{ checkedRoleIds.length }} / {{ roles.length }} 个角色</span>
-            <el-tag v-if="hasChanges" type="warning" effect="plain">有未保存更改</el-tag>
-            <el-tag v-else type="success" effect="plain">已同步</el-tag>
+            <span class="status-pill" :class="hasChanges ? 'warning' : 'success'">{{ hasChanges ? '有未保存更改' : '已同步' }}</span>
           </div>
 
-          <el-input v-model="roleKeyword" clearable class="role-search" placeholder="搜索角色名称或编码" prefix-icon="Search" />
+          <n-input v-model:value="roleKeyword" clearable class="role-search" placeholder="搜索角色名称或编码">
+            <template #prefix><n-icon :component="Search24Regular" /></template>
+          </n-input>
 
-          <el-checkbox-group v-model="checkedRoleIds" class="role-list">
-            <el-checkbox
-              v-for="role in filteredRoles"
-              :key="roleId(role)"
-              class="role-option"
-              :class="{ disabled: !isRoleEnabled(role) }"
-              :label="roleId(role)"
-              :disabled="!isRoleEnabled(role)"
-              border
-            >
-              <div class="role-option-content">
-                <div>
-                  <strong>{{ roleName(role) }}</strong>
-                  <small>{{ roleCode(role) }}</small>
-                </div>
-                <el-tag size="small" :type="isRoleEnabled(role) ? roleTag(role) : 'info'" effect="plain">
-                  {{ isRoleEnabled(role) ? roleTypeLabel(role) : '停用' }}
-                </el-tag>
-              </div>
-            </el-checkbox>
-          </el-checkbox-group>
-
-          <el-empty v-if="!filteredRoles.length" description="没有匹配的角色" />
+          <n-spin :show="roleLoading">
+            <n-checkbox-group v-model:value="checkedRoleIds" class="role-list">
+              <n-checkbox
+                v-for="role in filteredRoles"
+                :key="roleId(role)"
+                class="role-option"
+                :value="roleId(role)"
+                :disabled="!isRoleEnabled(role)"
+              >
+                <span class="role-option-content">
+                  <span>
+                    <strong>{{ roleName(role) }}</strong>
+                    <small>{{ roleCode(role) }}</small>
+                  </span>
+                  <span class="status-pill" :class="isRoleEnabled(role) ? roleTag(role) : ''">
+                    {{ isRoleEnabled(role) ? roleTypeLabel(role) : '停用' }}
+                  </span>
+                </span>
+              </n-checkbox>
+            </n-checkbox-group>
+            <n-empty v-if="!filteredRoles.length" description="没有匹配的角色" />
+          </n-spin>
 
           <div class="selected-tags">
             <span>当前角色</span>
             <div>
-              <el-tag
-                v-for="role in selectedRoles"
-                :key="roleId(role)"
-                closable
-                :type="roleTag(role)"
-                @close="removeRole(role)"
-              >
-                {{ roleName(role) }}
-              </el-tag>
-              <el-tag v-if="!selectedRoles.length" type="info" effect="plain">未分配角色</el-tag>
+              <n-tag v-for="role in selectedRoles" :key="roleId(role)" closable @close="removeRole(role)">{{ roleName(role) }}</n-tag>
+              <span v-if="!selectedRoles.length" class="status-pill">未分配角色</span>
             </div>
           </div>
         </template>
-      </el-card>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ArrowSync24Regular, Save24Regular, Search24Regular } from '@vicons/fluent'
 import { fetchRoles, fetchUserRoleIds, fetchUsers, saveUserRoles } from '@/api/system'
 import type { RoleItem, UserItem } from '@/types/system'
-import defaultAvatar from '@/assets/default-avatar.webp'
+import { defaultAvatar, resolveAvatarUrl } from '@/utils/avatar'
+import { message } from '@/utils/feedback'
 
 type RoleId = string
-type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info'
+type TagType = 'primary' | 'success' | 'warning' | 'danger' | ''
 
 const query = reactive({ keyword: '', current: 1, size: 10 })
 const roleKeyword = ref('')
@@ -269,7 +252,7 @@ async function handleSave() {
     await saveUserRoles(selectedUser.value.userId, toApiIds(enabledIds))
     checkedRoleIds.value = enabledIds
     originalRoleIds.value = enabledIds
-    ElMessage.success('用户角色授权已保存')
+    message.success('用户角色授权已保存')
   } finally {
     saving.value = false
   }
@@ -308,24 +291,42 @@ onMounted(() => {
   min-height: calc(100vh - 156px);
 }
 
+.card-header {
+  margin-bottom: 16px;
+  font-weight: 750;
+}
+
 .user-toolbar {
   margin-bottom: 14px;
 }
 
-.user-table :deep(.el-table__row) {
+.user-list {
+  display: grid;
+  gap: 8px;
+}
+
+.user-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
   cursor: pointer;
 }
 
-.user-cell,
-.selected-user {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.user-row.active,
+.user-row:hover {
+  border-color: var(--accent-primary);
+  background: var(--glass-surface-hover);
 }
 
-.user-cell strong,
-.user-cell small,
+.user-row strong,
+.user-row small,
 .selected-user strong,
 .selected-user span,
 .role-option-content strong,
@@ -333,30 +334,28 @@ onMounted(() => {
   display: block;
 }
 
-.user-cell strong,
-.selected-user strong,
-.role-option-content strong {
-  color: #0f172a;
-}
-
-.user-cell small,
+.user-row small,
 .selected-user span,
 .role-option-content small {
   margin-top: 3px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .pagination {
-  margin-top: 16px;
   justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .selected-user {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface-muted);
 }
 
 .assignment-summary {
@@ -365,7 +364,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   margin: 16px 0 12px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -381,18 +380,11 @@ onMounted(() => {
 }
 
 .role-option {
-  margin-right: 0;
-  height: auto;
-  padding: 12px 14px;
-}
-
-.role-option.disabled {
-  opacity: 0.55;
-}
-
-.role-option :deep(.el-checkbox__label) {
   min-width: 0;
-  flex: 1;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
 }
 
 .role-option-content {
@@ -408,8 +400,8 @@ onMounted(() => {
   gap: 10px;
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-  color: #64748b;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -417,5 +409,11 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+@media (max-width: 1100px) {
+  .grant-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -1,97 +1,92 @@
 <template>
-  <div>
+  <div class="page-shell">
     <div class="page-header">
       <div>
         <h1 class="page-title">资源管理</h1>
-        <p class="page-subtitle">按服务、包目录、Controller 和 API 路径浏览后端资源清单</p>
+        <p class="page-subtitle">按服务、Controller 和 API 路径浏览后端资源清单</p>
       </div>
-      <el-button icon="Refresh" :loading="syncing" @click="handleSync">同步资源</el-button>
+      <n-button :loading="syncing" @click="handleSync">
+        <template #icon><n-icon :component="ArrowSync24Regular" /></template>
+        同步资源
+      </n-button>
     </div>
 
     <div class="resource-layout">
-      <el-card class="page-card resource-tree-card">
+      <section class="page-card resource-tree-card">
         <div class="resource-toolbar">
-          <el-input v-model="filterText" clearable placeholder="搜索服务、包名、Controller 或 API" prefix-icon="Search" />
+          <n-input v-model:value="filterText" clearable placeholder="搜索服务或接口路径">
+            <template #prefix><n-icon :component="Search24Regular" /></template>
+          </n-input>
           <div class="resource-stats">
-            <el-statistic title="服务" :value="stats.services" />
-            <el-statistic title="接口" :value="stats.apis" />
+            <span><strong>{{ stats.services }}</strong><small>服务</small></span>
+            <span><strong>{{ matchedApiCount }}</strong><small>{{ filterText ? '匹配接口' : '接口' }}</small></span>
           </div>
         </div>
 
-        <el-tree
-          ref="treeRef"
-          v-loading="loading"
-          class="resource-tree"
-          :data="resources"
-          node-key="id"
-          default-expand-all
-          highlight-current
-          :props="treeProps"
-          :filter-node-method="filterNode"
-          @current-change="selectedNode = $event"
-        >
-          <template #default="{ data }">
-            <div class="resource-node" :class="{ api: isApiNode(data), disabled: isDisabledApiNode(data) }">
-              <div class="resource-node-main">
-                <el-icon class="resource-node-icon">
-                  <component :is="nodeIcon(data)" />
-                </el-icon>
-                <span class="resource-node-label">{{ data.label }}</span>
-                <el-tag v-if="isApiNode(data)" size="small" :type="methodMeta(data.resource?.httpMethod).tag">
-                  {{ data.resource?.httpMethod || 'ANY' }}
-                </el-tag>
-                <el-tag v-if="isDisabledApiNode(data)" size="small" type="info" effect="plain">停用</el-tag>
-              </div>
+        <n-spin :show="loading">
+          <n-tree
+            block-line
+            :data="treeData"
+            key-field="id"
+            label-field="label"
+            children-field="children"
+            :pattern="filterText"
+            :filter="resourceTreeFilter"
+            :expanded-keys="expandedKeys"
+            :selected-keys="selectedKeys"
+            :render-label="renderResourceLabel"
+            :node-props="resourceNodeProps"
+            :override-default-node-click-behavior="overrideNodeClickBehavior"
+            selectable
+            @update:selected-keys="handleSelect"
+            @update:expanded-keys="handleExpandedKeys"
+          />
+        </n-spin>
+      </section>
 
-              <el-dropdown
-                v-if="isApiNode(data)"
-                trigger="click"
-                placement="bottom-end"
-                @command="handleResourceCommand(data, $event as ResourceCommand)"
-              >
-                <el-button class="node-action" text icon="MoreFilled" @click.stop />
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item :command="isResourceEnabled(data.resource) ? 'disable' : 'enable'">
-                      {{ isResourceEnabled(data.resource) ? '停用资源' : '启用资源' }}
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-          </template>
-        </el-tree>
-      </el-card>
-
-      <el-card class="page-card detail-card">
-        <template #header>
-          <span>资源详情</span>
-        </template>
-        <el-empty v-if="!selectedNode" description="请选择左侧资源节点" />
+      <section class="page-card detail-card">
+        <h2 class="detail-card-title">资源详情</h2>
+        <n-empty v-if="!selectedNode" description="请选择左侧资源节点" />
         <div v-else class="detail-content">
           <div class="detail-title">
-            <el-icon><component :is="nodeIcon(selectedNode)" /></el-icon>
+            <n-icon :component="nodeIcon(selectedNode)" />
             <strong>{{ selectedNode.label }}</strong>
-            <el-tag :type="nodeTypeMeta(selectedNode.type).tag">{{ nodeTypeMeta(selectedNode.type).label }}</el-tag>
-            <el-tag v-if="isApiNode(selectedNode)" :type="isResourceEnabled(selectedNode.resource) ? 'success' : 'info'">
+            <span class="status-pill" :class="nodeTypeMeta(selectedNode.type).tag">{{ nodeTypeMeta(selectedNode.type).label }}</span>
+            <span v-if="isApiNode(selectedNode)" class="status-pill" :class="isResourceEnabled(selectedNode.resource) ? 'success' : ''">
               {{ isResourceEnabled(selectedNode.resource) ? '启用' : '停用' }}
-            </el-tag>
+            </span>
+            <n-popconfirm
+              v-if="isApiNode(selectedNode)"
+              :positive-text="isResourceEnabled(selectedNode.resource) ? '停用' : '启用'"
+              negative-text="取消"
+              :positive-button-props="{ type: isResourceEnabled(selectedNode.resource) ? 'error' : 'primary' }"
+              @positive-click="toggleResource(selectedNode)"
+            >
+              <template #trigger>
+                <n-button size="small">
+                  {{ isResourceEnabled(selectedNode.resource) ? '停用资源' : '启用资源' }}
+                </n-button>
+              </template>
+              确认{{ isResourceEnabled(selectedNode.resource) ? '停用' : '启用' }}资源 {{ selectedNode.resource?.path || selectedNode.label }}？
+            </n-popconfirm>
           </div>
 
           <template v-if="isApiNode(selectedNode)">
             <div class="method-line">
-              <el-tag :type="methodMeta(selectedNode.resource?.httpMethod).tag">
+              <span class="status-pill" :class="methodMeta(selectedNode.resource?.httpMethod).tag">
                 {{ selectedNode.resource?.httpMethod || 'ANY' }}
-              </el-tag>
+              </span>
               <code>{{ selectedNode.resource?.path }}</code>
             </div>
 
-            <el-descriptions :column="1" border>
-              <el-descriptions-item label="资源编码">{{ selectedNode.resource?.resourceCode || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="服务">{{ selectedNode.resource?.serviceName || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="Controller">{{ selectedNode.resource?.controllerName || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="处理方法">{{ selectedNode.resource?.methodName || '-' }}</el-descriptions-item>
-            </el-descriptions>
+            <dl class="detail-list">
+              <div><dt>资源编码</dt><dd>{{ selectedNode.resource?.resourceCode || '-' }}</dd></div>
+              <div><dt>服务</dt><dd>{{ selectedNode.resource?.serviceName || '-' }}</dd></div>
+              <div><dt>Controller</dt><dd>{{ selectedNode.resource?.controllerName || '-' }}</dd></div>
+              <div><dt>Java 包</dt><dd>{{ packagePathFromControllerPath(selectedNode.resource?.controllerPath) || '-' }}</dd></div>
+              <div><dt>Controller 文件</dt><dd>{{ selectedNode.resource?.controllerPath || '-' }}</dd></div>
+              <div><dt>处理方法</dt><dd>{{ selectedNode.resource?.methodName || '-' }}</dd></div>
+            </dl>
 
             <section class="detail-section">
               <h2>接口描述</h2>
@@ -109,22 +104,46 @@
             </section>
           </template>
 
-          <el-alert v-else type="info" :closable="false" show-icon title="目录节点用于组织资源，不直接参与接口鉴权。" />
+          <template v-else>
+            <n-alert type="info" :bordered="false">目录节点用于组织资源，不直接参与接口鉴权。</n-alert>
+            <dl class="detail-list">
+              <div><dt>节点类型</dt><dd>{{ nodeTypeMeta(selectedNode.type).label }}</dd></div>
+              <div><dt>接口数量</dt><dd>{{ directoryApiCount(selectedNode) }} 个</dd></div>
+              <div v-if="displayNode(selectedNode).serviceName"><dt>服务</dt><dd>{{ displayNode(selectedNode).serviceName }}</dd></div>
+              <div v-if="displayNode(selectedNode).controllerName"><dt>Controller</dt><dd>{{ displayNode(selectedNode).controllerName }}</dd></div>
+              <div v-if="displayNode(selectedNode).controllerPath"><dt>Java 包</dt><dd>{{ packagePathFromControllerPath(displayNode(selectedNode).controllerPath) || '-' }}</dd></div>
+              <div v-if="displayNode(selectedNode).controllerPath"><dt>Controller 文件</dt><dd>{{ displayNode(selectedNode).controllerPath }}</dd></div>
+            </dl>
+          </template>
         </div>
-      </el-card>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import type { ElTree } from 'element-plus'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, h, nextTick, onMounted, ref } from 'vue'
+import type { Key } from 'treemate'
+import type { TreeOption, TreeOverrideNodeClickBehavior } from 'naive-ui'
+import { NIcon } from 'naive-ui'
+import { ArrowSync24Regular, Cloud24Regular, Folder24Regular, Link24Regular, Search24Regular, Server24Regular } from '@vicons/fluent'
 import { fetchResources, syncResources, updateResource } from '@/api/system'
 import type { ResourceItem, ResourceTreeNode } from '@/types/system'
+import { message } from '@/utils/feedback'
+import {
+  apiDisplayMethod,
+  apiDisplayPath,
+  buildResourceDisplayTree,
+  countMatchedApis,
+  countResourceTree,
+  findResourceNode,
+  isDisplayApiNode,
+  packagePathFromControllerPath,
+  resourceTreeFilter,
+  type ResourceDisplayNode
+} from '@/utils/resourceTree'
 
-type TagType = 'primary' | 'success' | 'warning' | 'danger' | 'info'
-type ResourceCommand = 'enable' | 'disable'
+type TagType = 'primary' | 'success' | 'warning' | 'danger' | ''
 
 interface DescriptionParam {
   name: string
@@ -137,93 +156,62 @@ interface ParsedDescription {
   returns: string
 }
 
-const treeProps = { label: 'label', children: 'children' }
 const loading = ref(false)
 const syncing = ref(false)
 const filterText = ref('')
-const resources = ref<ResourceTreeNode[]>([])
+const resources = ref<ResourceDisplayNode[]>([])
 const selectedNode = ref<ResourceTreeNode | null>(null)
-const treeRef = ref<InstanceType<typeof ElTree>>()
+const selectedKeys = ref<Key[]>([])
+const expandedKeys = ref<Key[]>([])
 
+const treeData = computed(() => resources.value)
 const stats = computed(() => countStats(resources.value))
+const matchedApiCount = computed(() => countMatchedApis(resources.value, filterText.value))
 const parsedDescription = computed(() => parseDescription(selectedNode.value?.resource?.description))
 const requestExample = computed(() => normalizeJson(selectedNode.value?.resource?.requestExample, '{}'))
 const responseExample = computed(() => normalizeJson(selectedNode.value?.resource?.responseExample, '{}'))
 const requestExampleHtml = computed(() => highlightJson(requestExample.value))
 const responseExampleHtml = computed(() => highlightJson(responseExample.value))
 
-watch(filterText, (value) => {
-  treeRef.value?.filter(value)
-})
-
 function isApiNode(node?: ResourceTreeNode | null) {
-  return node?.type?.toString().toLowerCase() === 'api'
+  return isDisplayApiNode(node)
 }
 
 function isResourceEnabled(resource?: ResourceItem | null) {
   return resource?.enabled !== false
 }
 
-function isDisabledApiNode(node?: ResourceTreeNode | null) {
-  return isApiNode(node) && !isResourceEnabled(node?.resource)
-}
-
 function nodeIcon(node: ResourceTreeNode) {
   const type = node.type.toString().toLowerCase()
-  if (type === 'api') return 'Link'
-  if (type === 'controller') return 'Document'
-  if (type === 'service') return 'Box'
-  return 'Folder'
+  if (type === 'api') return Link24Regular
+  if (type === 'controller') return Folder24Regular
+  if (type === 'service') return Server24Regular
+  return Folder24Regular
 }
 
 function nodeTypeMeta(type: ResourceTreeNode['type']): { label: string; tag: TagType } {
   const key = type.toString().toLowerCase()
   const map: Record<string, { label: string; tag: TagType }> = {
     service: { label: '服务', tag: 'primary' },
-    package: { label: '包目录', tag: 'info' },
     controller: { label: 'Controller', tag: 'success' },
     api: { label: 'API', tag: 'warning' }
   }
-  return map[key] || { label: type.toString(), tag: 'info' }
+  return map[key] || { label: type.toString(), tag: '' }
 }
 
 function methodMeta(method?: string | null): { tag: TagType } {
   const map: Record<string, TagType> = {
     GET: 'success',
-    POST: 'primary',
-    PUT: 'warning',
-    PATCH: 'warning',
+    POST: 'warning',
+    PUT: 'primary',
+    PATCH: 'primary',
     DELETE: 'danger'
   }
-  return { tag: map[(method || '').toUpperCase()] || 'info' }
-}
-
-function filterNode(value: string, data: ResourceTreeNode) {
-  if (!value) return true
-  const keyword = value.toLowerCase()
-  return [
-    data.label,
-    data.resource?.path,
-    data.resource?.httpMethod,
-    data.resource?.resourceCode,
-    data.resource?.controllerName,
-    data.resource?.methodName,
-    data.resource?.description
-  ].some((item) => item?.toLowerCase().includes(keyword))
+  return { tag: map[(method || '').toUpperCase()] || '' }
 }
 
 function countStats(nodes: ResourceTreeNode[]) {
-  const result = { services: 0, apis: 0 }
-  const walk = (items: ResourceTreeNode[]) => {
-    items.forEach((item) => {
-      const type = item.type.toString().toLowerCase()
-      if (type === 'service') result.services += 1
-      if (type === 'api') result.apis += 1
-      if (item.children?.length) walk(item.children)
-    })
-  }
-  walk(nodes)
-  return result
+  return countResourceTree(nodes)
 }
 
 function parseDescription(description?: string | null): ParsedDescription {
@@ -298,49 +286,124 @@ function escapeHtml(value: string) {
 async function loadData() {
   loading.value = true
   try {
-    resources.value = await fetchResources()
-    selectedNode.value = firstApiNode(resources.value) || resources.value[0] || null
+    resources.value = buildResourceDisplayTree(await fetchResources())
+    expandedKeys.value = []
+    selectedNode.value = resources.value[0] || null
+    selectedKeys.value = selectedNode.value ? [selectedNode.value.id] : []
     await nextTick()
-    if (selectedNode.value) {
-      treeRef.value?.setCurrentKey(selectedNode.value.id)
-    }
   } finally {
     loading.value = false
   }
 }
 
-function firstApiNode(nodes: ResourceTreeNode[]): ResourceTreeNode | null {
-  for (const node of nodes) {
-    if (isApiNode(node)) return node
-    const child = firstApiNode(node.children || [])
-    if (child) return child
+function handleSelect(keys: Key[]) {
+  selectedKeys.value = keys
+  selectedNode.value = keys.length ? findResourceNode(resources.value, keys[0]) : null
+}
+
+function handleExpandedKeys(keys: Key[]) {
+  expandedKeys.value = keys
+}
+
+function resourceNodeProps({ option }: { option: TreeOption }) {
+  const node = option as unknown as ResourceDisplayNode
+  if (isApiNode(node)) return {}
+  return {
+    onClick: () => {
+      selectedNode.value = node
+      selectedKeys.value = [node.id]
+    }
   }
-  return null
+}
+
+const overrideNodeClickBehavior: TreeOverrideNodeClickBehavior = ({ option }) => {
+  const node = option as unknown as ResourceDisplayNode
+  return isApiNode(node) ? 'toggleSelect' : 'toggleExpand'
 }
 
 async function handleSync() {
   syncing.value = true
   try {
     const result = await syncResources()
-    ElMessage.success(`资源同步完成${typeof result?.count === 'number' ? `，扫描 ${result.count} 条` : ''}`)
+    message.success(`资源同步完成${typeof result?.count === 'number' ? `，扫描 ${result.count} 条` : ''}`)
     await loadData()
   } finally {
     syncing.value = false
   }
 }
 
-async function handleResourceCommand(node: ResourceTreeNode, command: ResourceCommand) {
+function toggleResource(node: ResourceTreeNode) {
   if (!node.resource) return
-  const enabled = command === 'enable'
+  const enabled = !isResourceEnabled(node.resource)
   const actionLabel = enabled ? '启用' : '停用'
-  await ElMessageBox.confirm(`确认${actionLabel}资源 ${node.resource.path || node.label}？`, '状态变更确认', {
-    type: enabled ? 'success' : 'warning',
-    confirmButtonText: actionLabel,
-    cancelButtonText: '取消'
+  return updateResource(node.resource.id, { enabled }).then(async () => {
+    message.success(`资源已${actionLabel}`)
+    await loadData()
   })
-  await updateResource(node.resource.id, { enabled })
-  ElMessage.success(`资源已${actionLabel}`)
-  await loadData()
+}
+
+function renderResourceLabel({ option }: { option: TreeOption }) {
+  const node = option as unknown as ResourceDisplayNode
+  const type = node.type.toString().toLowerCase()
+  if (type === 'service') return renderServiceLabel(node)
+  if (type === 'controller') return renderControllerLabel(node)
+  if (type === 'api') return renderApiLabel(node)
+  return h('span', { class: 'resource-node-label' }, node.label)
+}
+
+function renderServiceLabel(node: ResourceDisplayNode) {
+  return h('span', { class: ['resource-node-label', 'resource-node-service'] }, [
+    h('span', { class: ['resource-node-icon', 'service-icon', serviceTone(node.label)], title: '后端服务', 'aria-hidden': 'true' }, [
+      h(NIcon, { component: node.label.includes('gateway') ? Cloud24Regular : Server24Regular })
+    ]),
+    h('span', { class: 'resource-node-main' }, [
+      h('strong', node.label)
+    ])
+  ])
+}
+
+function renderControllerLabel(node: ResourceDisplayNode) {
+  return h('span', { class: ['resource-node-label', 'resource-node-controller'] }, [
+    h('span', { class: 'resource-node-icon controller-icon', title: 'Controller', 'aria-hidden': 'true' }, [
+      h(NIcon, { component: Folder24Regular })
+    ]),
+    h('span', { class: 'resource-node-main' }, [
+      h('strong', node.label)
+    ])
+  ])
+}
+
+function renderApiLabel(node: ResourceDisplayNode) {
+  const method = apiDisplayMethod(node)
+  return h('span', { class: ['resource-node-label', 'resource-node-api'] }, [
+    h('span', { class: ['method-badge', methodClass(method)], title: `HTTP ${method}`, 'aria-label': `HTTP 方法 ${method}` }, method),
+    h('span', { class: 'api-path' }, apiDisplayPath(node)),
+    node.resource?.enabled === false ? h('span', { class: 'status-pill' }, '停用') : null
+  ])
+}
+
+function methodClass(method?: string | null) {
+  const key = (method || 'ANY').toLowerCase()
+  if (key === 'get') return 'method-get'
+  if (key === 'post') return 'method-post'
+  if (key === 'put' || key === 'patch') return 'method-update'
+  if (key === 'delete') return 'method-delete'
+  return 'method-any'
+}
+
+function serviceTone(label?: string) {
+  const tones = ['service-tone-blue', 'service-tone-green', 'service-tone-violet', 'service-tone-orange']
+  const sum = String(label || '').split('').reduce((total, char) => total + char.charCodeAt(0), 0)
+  return tones[sum % tones.length]
+}
+
+function displayNode(node: ResourceTreeNode) {
+  return node as ResourceDisplayNode
+}
+
+function directoryApiCount(node: ResourceTreeNode) {
+  const current = node as ResourceDisplayNode
+  return current.apiCount || countStats(current.children || []).apis
 }
 
 onMounted(loadData)
@@ -349,7 +412,7 @@ onMounted(loadData)
 <style scoped>
 .resource-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(460px, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.9fr);
   gap: 18px;
   align-items: start;
 }
@@ -369,76 +432,161 @@ onMounted(loadData)
 
 .resource-stats {
   display: flex;
-  gap: 22px;
-  padding: 0 4px;
+  gap: 12px;
 }
 
-.resource-tree {
-  --el-tree-node-hover-bg-color: #f1f5f9;
+.resource-stats span {
+  display: grid;
+  min-width: 76px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
 }
 
-.resource-tree :deep(.el-tree-node__content) {
-  height: 38px;
-  border-radius: 8px;
+.resource-stats strong {
+  font-size: 18px;
 }
 
-.resource-node {
+.resource-stats small {
+  color: var(--text-muted);
+}
+
+.resource-tree-card :deep(.n-tree-node-content) {
+  min-height: 38px;
+  cursor: pointer;
+}
+
+.resource-tree-card :deep(.n-tree-node-switcher) {
+  display: none;
+}
+
+.resource-node-label {
   min-width: 0;
-  width: 100%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
 }
 
 .resource-node-main {
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 2px;
 }
 
-.resource-node.api .resource-node-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-}
-
-.resource-node.disabled {
-  color: #94a3b8;
-}
-
-.resource-node-icon {
-  color: #64748b;
-}
-
-.resource-node.disabled .resource-node-icon {
-  color: #cbd5e1;
-}
-
-.resource-node-label {
+.resource-node-main strong,
+.api-path {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.node-action {
-  width: 26px;
-  height: 26px;
-  opacity: 0;
+.resource-node-main small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
-.resource-tree :deep(.el-tree-node__content:hover) .node-action {
-  opacity: 1;
+.resource-node-service .resource-node-main strong {
+  font-size: 15px;
+  font-weight: 850;
 }
 
-.detail-content {
+.resource-node-controller .resource-node-main strong {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.resource-node-api {
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.resource-node-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+}
+
+.service-icon {
+  color: var(--text-on-accent);
+}
+
+.service-tone-blue {
+  background: #2563eb;
+}
+
+.service-tone-green {
+  background: #059669;
+}
+
+.service-tone-violet {
+  background: #7c3aed;
+}
+
+.service-tone-orange {
+  background: #ea580c;
+}
+
+.controller-icon {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.method-badge {
+  min-width: 54px;
+  display: inline-flex;
+  justify-content: center;
+  padding: 3px 7px;
+  color: #fff;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.method-get {
+  background: #2563eb;
+}
+
+.method-post {
+  background: #059669;
+}
+
+.method-update {
+  background: #ea580c;
+}
+
+.method-delete {
+  background: #dc2626;
+}
+
+.method-any {
+  background: #64748b;
+}
+
+.detail-card-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.detail-content,
+.detail-section {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .detail-title,
 .method-line {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -446,34 +594,52 @@ onMounted(loadData)
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 16px;
-  color: #0f172a;
 }
 
 .method-line code {
   min-width: 0;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #f8fafc;
-  color: #334155;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: var(--bg-surface-muted);
+  color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
 
-.detail-section {
+.detail-list {
   display: grid;
-  gap: 8px;
+  gap: 0;
+  margin: 0;
+}
+
+.detail-list div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.detail-list dt {
+  color: var(--text-muted);
+}
+
+.detail-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-section h2,
+.detail-section p {
+  margin: 0;
 }
 
 .detail-section h2 {
-  margin: 0;
   font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
 }
 
 .detail-section p {
-  margin: 0;
-  line-height: 1.7;
-  color: #475569;
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
 }
 
 .json-view {
@@ -481,33 +647,19 @@ onMounted(loadData)
   max-height: 260px;
   overflow: auto;
   padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   background: #0f172a;
   color: #e2e8f0;
   font-size: 12px;
   line-height: 1.6;
 }
 
-.json-view :deep(.json-key) {
-  color: #7dd3fc;
-}
-
-.json-view :deep(.json-string) {
-  color: #86efac;
-}
-
-.json-view :deep(.json-number) {
-  color: #fbbf24;
-}
-
-.json-view :deep(.json-boolean) {
-  color: #c4b5fd;
-}
-
-.json-view :deep(.json-null) {
-  color: #fca5a5;
-}
+.json-view :deep(.json-key) { color: #7dd3fc; }
+.json-view :deep(.json-string) { color: #86efac; }
+.json-view :deep(.json-number) { color: #fbbf24; }
+.json-view :deep(.json-boolean) { color: #c4b5fd; }
+.json-view :deep(.json-null) { color: #fca5a5; }
 
 @media (max-width: 1100px) {
   .resource-layout {

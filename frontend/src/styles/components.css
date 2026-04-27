@@ -1,0 +1,223 @@
+.n-button--primary-type {
+  position: relative;
+  overflow: hidden;
+  font-weight: 650;
+  letter-spacing: 0;
+  transition:
+    transform var(--duration-spring) var(--ease-spring),
+    box-shadow var(--duration-spring) var(--ease-spring),
+    border-color var(--duration-base) var(--ease-out-quint),
+    background-color var(--duration-base) var(--ease-out-quint);
+}
+
+.n-button--primary-type::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+}
+
+.n-button--primary-type:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 20px var(--accent-primary-muted);
+}
+
+.n-button--primary-type:hover::after {
+  left: 200%;
+  transition: left 0.8s ease-in-out;
+}
+
+.n-input {
+  transition:
+    background-color var(--duration-base) var(--ease-out-quint),
+    box-shadow var(--duration-base) var(--ease-out-quint),
+    transform var(--duration-base) var(--ease-out-quint);
+}
+
+.n-input:focus-within {
+  transform: translateY(-1px);
+}
+
+.n-card,
+.n-modal,
+.n-drawer-content {
+  color: var(--text-primary);
+}
+
+.ai-generating-text {
+  color: var(--text-secondary);
+  background: linear-gradient(90deg, var(--text-primary) 25%, var(--text-muted) 50%, var(--text-primary) 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmerText 2s infinite linear;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 9px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.status-pill.success {
+  color: var(--accent-success);
+  background: color-mix(in srgb, var(--accent-success) 12%, var(--bg-surface));
+}
+
+.status-pill.warning {
+  color: var(--accent-warning);
+  background: color-mix(in srgb, var(--accent-warning) 12%, var(--bg-surface));
+}
+
+.status-pill.danger {
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 12%, var(--bg-surface));
+}
+
+.status-pill.primary {
+  color: var(--accent-primary);
+  background: var(--accent-primary-muted);
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition:
+    transform var(--duration-spring) var(--ease-spring),
+    background-color var(--duration-base) var(--ease-out-quint),
+    box-shadow var(--duration-base) var(--ease-out-quint);
+}
+
+.icon-button:hover {
+  transform: translateY(-1px);
+  background: var(--glass-surface-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.resource-node-label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.resource-node-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.resource-node-main strong,
+.api-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-node-main small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.resource-node-service .resource-node-main strong {
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.resource-node-controller .resource-node-main strong {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.resource-node-api {
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.resource-node-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+}
+
+.service-icon {
+  color: var(--text-on-accent);
+}
+
+.service-tone-blue {
+  background: #2563eb;
+}
+
+.service-tone-green {
+  background: #059669;
+}
+
+.service-tone-violet {
+  background: #7c3aed;
+}
+
+.service-tone-orange {
+  background: #ea580c;
+}
+
+.controller-icon {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.method-badge {
+  min-width: 54px;
+  display: inline-flex;
+  justify-content: center;
+  padding: 3px 7px;
+  color: #fff;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.method-get {
+  background: #059669;
+}
+
+.method-post {
+  background: #ea580c;
+}
+
+.method-update {
+  background: #2563eb;
+}
+
+.method-delete {
+  background: #dc2626;
+}
+
+.method-any {
+  background: #64748b;
+}
